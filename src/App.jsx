@@ -266,7 +266,7 @@ const App = () => {
 
     if (autoLab) {
       setErrorMsg(
-        "This laboratory subject follows the status of its Lecture co-requisite."
+        "This laboratory course follows the status of its Lecture co-requisite."
       );
       setTimeout(() => setErrorMsg(""), 3000);
       return;
@@ -305,7 +305,7 @@ const App = () => {
 
       if (Object.keys(synced).length === Object.keys(prev).length) {
         setErrorMsg(
-          "No additional subjects in this term can be marked as passed yet."
+          "No additional courses in this term can be marked as passed yet."
         );
         setTimeout(() => setErrorMsg(""), 3000);
       }
@@ -350,7 +350,7 @@ const App = () => {
       );
       if (!changed) {
         setErrorMsg(
-          "All subjects in this year are already marked as passed."
+          "All courses in this year are already marked as passed."
         );
         setTimeout(() => setErrorMsg(""), 3000);
       }
@@ -421,6 +421,23 @@ const App = () => {
 
   const remainingUnits = Math.max(totalUnits - completedUnits, 0);
 
+  // --- COURSE COUNTS ---
+  // Count how many courses are passed, taking, inactive/failed
+  let passedCourses = 0;
+  let activeCourses = 0;
+  let inactiveCourses = 0;
+
+  CURRICULUM_DATA.forEach((year) =>
+    year.terms.forEach((term) =>
+      term.courses.forEach((course) => {
+        const status = courseStatus[course.id] || "inactive";
+        if (status === "passed") passedCourses += 1;
+        else if (status === "taking") activeCourses += 1;
+        else inactiveCourses += 1; // "inactive" (includes never-taken / failed)
+      })
+    )
+  );
+
   let percentage = 0;
   if (totalUnits > 0) {
     percentage = Math.round((completedUnits / totalUnits) * 100);
@@ -459,6 +476,9 @@ const App = () => {
               <span className="uppercase tracking-wider text-blue-100">
                 Units Completed
               </span>
+              <span className="block text-[10px] md:text-xs text-blue-100/80 mt-1">
+                ({passedCourses} courses)
+              </span>
             </div>
             <div className="border-x border-blue-300/60 px-3">
               <span className="block text-lg md:text-2xl font-bold">
@@ -467,6 +487,9 @@ const App = () => {
               <span className="uppercase tracking-wider text-blue-100">
                 Units Active
               </span>
+              <span className="block text-[10px] md:text-xs text-blue-100/80 mt-1">
+                ({activeCourses} courses)
+              </span>
             </div>
             <div>
               <span className="block text-lg md:text-2xl font-bold">
@@ -474,6 +497,9 @@ const App = () => {
               </span>
               <span className="uppercase tracking-wider text-blue-100">
                 Units Remaining
+              </span>
+              <span className="block text-[10px] md:text-xs text-blue-100/80 mt-1">
+                ({inactiveCourses} courses)
               </span>
             </div>
           </div>
@@ -808,7 +834,7 @@ const App = () => {
                   <strong>v14:</strong> Introduced dedicated status buttons
                   (Inactive / Failed, Active, Passed) for each course instead
                   of click-cycling; added co-requisite display linking
-                  Laboratory subjects to their Lecture counterparts.
+                  Laboratory courses to their Lecture counterparts.
                 </li>
                 <li>
                   <strong>v15:</strong> Implemented automatic synchronization
