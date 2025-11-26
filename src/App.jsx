@@ -192,6 +192,20 @@ const CURRICULUM_DATA = [
   },
 ];
 
+// GPA DROPDOWN OPTIONS
+const GPA_OPTIONS = [
+  "",
+  "0.0",
+  "0.5",
+  "1.0",
+  "1.5",
+  "2.0",
+  "2.5",
+  "3.0",
+  "3.5",
+  "4.0",
+];
+
 // Build a set of all course IDs to detect lecture counterparts
 const buildCourseIdSet = () => {
   const set = new Set();
@@ -217,10 +231,14 @@ const getCoreqLectureId = (courseId) =>
 
 const isLabCourse = (course) => course.id.endsWith("L");
 
-// --- SHARED GPA HELPERS (used by GPA Calculator page) ---
+// --- SHARED GPA HELPERS ---
 const getNumericGpaFromMap = (map, courseId) => {
   const val = map[courseId];
-  const num = typeof val === "string" ? parseFloat(val) : val;
+  if (val === undefined || val === "") return null;
+  const num =
+    typeof val === "string"
+      ? parseFloat(val)
+      : val;
   if (Number.isNaN(num)) return null;
   return num;
 };
@@ -235,7 +253,7 @@ const CurriculumTrackerPage = ({
   const [expandedYear, setExpandedYear] = useState("First Year");
 
   const isLocked = (course) => {
-    if (isAutoSyncedLabId(course.id)) return true; // auto labs are read-only
+    if (isAutoSyncedLabId(course.id)) return true;
     if (course.prereqs.length === 0) return false;
     const allPrereqsPassed = course.prereqs.every(
       (id) => courseStatus[id] === "passed"
@@ -243,7 +261,6 @@ const CurriculumTrackerPage = ({
     return !allPrereqsPassed;
   };
 
-  // Sync auto labs so they always mirror their lecture (inactive/taking/passed)
   const syncLabsWithLectures = (statusMap) => {
     const updated = { ...statusMap };
 
@@ -362,11 +379,11 @@ const CurriculumTrackerPage = ({
     setCourseStatus((prev) => {
       const next = { ...prev };
 
-      year.terms.forEach((term) => {
+      year.terms.forEach((term) =>
         term.courses.forEach((course) => {
           next[course.id] = "inactive";
-        });
-      });
+        })
+      );
 
       const synced = syncLabsWithLectures(next);
       return synced;
@@ -854,6 +871,11 @@ const CurriculumTrackerPage = ({
                   Tracking and GPA Calculation for a cleaner experience.
                 </li>
                 <li>
+                  <strong>v21:</strong> GPA Calculator now uses dropdowns with
+                  fixed increments (0.0–4.0) for easier and more consistent
+                  input.
+                </li>
+                <li>
                   Future versions will focus on UI refinements, export/backup
                   options, and support for curriculum changes or elective
                   tracks.
@@ -897,8 +919,8 @@ const GpaCalculatorPage = ({ courseGPA, setCourseGPA }) => {
   };
 
   // Global totals
-  let TCU = 0; // total course units
-  let TWQP = 0; // total weighted quality points
+  let TCU = 0;
+  let TWQP = 0;
 
   CURRICULUM_DATA.forEach((year) =>
     year.terms.forEach((term) =>
@@ -1027,7 +1049,7 @@ const GpaCalculatorPage = ({ courseGPA, setCourseGPA }) => {
                         {year.year}
                       </h2>
                       <p className="text-[11px] text-slate-500">
-                        Enter your final term GPA for each course.
+                        Select your final term GPA for each course.
                       </p>
                     </div>
                   </div>
@@ -1103,13 +1125,11 @@ const GpaCalculatorPage = ({ courseGPA, setCourseGPA }) => {
                                         {course.units} Units
                                       </span>
 
+                                      {/* GPA dropdown */}
                                       <div className="flex items-center gap-1 text-[11px] text-slate-500">
                                         <span>GPA:</span>
-                                        <input
-                                          type="number"
-                                          step="0.01"
-                                          min="0"
-                                          className="w-16 px-1 py-0.5 text-[11px] border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                        <select
+                                          className="w-20 px-1 py-0.5 text-[11px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
                                           value={courseGPA[course.id] ?? ""}
                                           onChange={(e) =>
                                             handleGpaChange(
@@ -1117,7 +1137,13 @@ const GpaCalculatorPage = ({ courseGPA, setCourseGPA }) => {
                                               e.target.value
                                             )
                                           }
-                                        />
+                                        >
+                                          {GPA_OPTIONS.map((opt) => (
+                                            <option key={opt} value={opt}>
+                                              {opt === "" ? "-" : opt}
+                                            </option>
+                                          ))}
+                                        </select>
                                       </div>
 
                                       {wqp !== null && (
@@ -1232,10 +1258,7 @@ const App = () => {
           setErrorMsg={setErrorMsg}
         />
       ) : (
-        <GpaCalculatorPage
-          courseGPA={courseGPA}
-          setCourseGPA={setCourseGPA}
-        />
+        <GpaCalculatorPage courseGPA={courseGPA} setCourseGPA={setCourseGPA} />
       )}
     </div>
   );
