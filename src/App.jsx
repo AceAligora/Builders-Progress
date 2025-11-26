@@ -22,39 +22,36 @@ const CURRICULUM_DATA = [
           { id: "COE0003", title: "Engineering Mathematics 2", units: 3, prereqs: [] },
           { id: "COE0005", title: "Chemistry for Engineers 1", units: 3, prereqs: [] },
           { id: "GED0001", title: "Specialized English Program 1", units: 3, prereqs: [] },
-          { id: "GED0004", title: "Physical Education 1", units: 3, prereqs: [] },
-          { id: "GED0006", title: "Personal and Professional Effectiveness", units: 2, prereqs: [] },
-          { id: "GED0007", title: "Art Appreciation", units: 3, prereqs: [] },
-          { id: "NSTP1", title: "Civic Welfare Training Service 1", units: 0, prereqs: [] }
-        ]
+          { id: "GED0003", title: "Purposive Communication", units: 3, prereqs: [] },
+          { id: "GED0007", title: "Readings in Philippine History", units: 3, prereqs: [] },
+          { id: "GED0009", title: "The Contemporary World", units: 3, prereqs: [] },
+          { id: "GED0013", title: "Understanding the Physical Self", units: 3, prereqs: [] },
+        ],
       },
       {
         termName: "Term 2",
         courses: [
-          { id: "COE0007", title: "Calculus 1", units: 3, prereqs: ["COE0001", "COE0003"] },
-          { id: "COE0009", title: "Physics for Engineers 1 (LEC)", units: 2, prereqs: ["COE0001", "COE0003"] },
+          { id: "COE0007", title: "Engineering Mathematics 3", units: 3, prereqs: ["COE0001"] },
+          { id: "COE0009", title: "Physics for Engineers 1 (LEC)", units: 3, prereqs: ["COE0001"] },
           { id: "COE0009L", title: "Physics for Engineers 1 (Lab)", units: 1, prereqs: [] },
           { id: "GED0015", title: "Physical Education 2", units: 3, prereqs: ["GED0004"] },
           { id: "GED0019", title: "Understanding the Self", units: 3, prereqs: [] },
           { id: "GED0021", title: "Specialized English Program 2", units: 3, prereqs: ["GED0001"] },
-          { id: "GED0027", title: "Mathematics in the Modern World", units: 3, prereqs: [] }
-        ]
+          { id: "GED0027", title: "Mathematics in the Modern World", units: 3, prereqs: [] },
+        ],
       },
       {
         termName: "Term 3",
         courses: [
           { id: "COE0011", title: "Engineering Data Analysis", units: 3, prereqs: ["COE0007"] },
           { id: "COE0013", title: "Calculus 2", units: 3, prereqs: ["COE0007"] },
-          { id: "COE0015", title: "Physics for Engineers 2 (LEC)", units: 2, prereqs: ["COE0009", "COE0007"] },
-          { id: "COE0015L", title: "Physics for Engineers 2 (Lab)", units: 1, prereqs: [] },
-          { id: "COE0017", title: "Chemistry for Engineers 2 (LEC)", units: 2, prereqs: ["COE0005"] },
-          { id: "COE0017L", title: "Chemistry for Engineers 2 (Lab)", units: 1, prereqs: [] },
-          { id: "GED0023", title: "Physical Education 3", units: 3, prereqs: ["GED0015"] },
-          { id: "GED0031", title: "Purposive Communication", units: 3, prereqs: ["GED0021"] },
-          { id: "NSTP2", title: "Civic Welfare Training Service 2", units: 0, prereqs: [] }
-        ]
-      }
-    ]
+          { id: "COE0015", title: "Physics for Engineers 2", units: 4, prereqs: ["COE0009"] },
+          { id: "GED0025", title: "Ethics", units: 3, prereqs: [] },
+          { id: "GED0029", title: "Art Appreciation", units: 3, prereqs: [] },
+          { id: "GED0031", title: "Readings in Philippine History 2", units: 3, prereqs: [] },
+        ],
+      },
+    ],
   },
   {
     year: "Second Year",
@@ -63,46 +60,35 @@ const CURRICULUM_DATA = [
       {
         termName: "Term 1",
         courses: [
-          { id: "CE0001", title: "Statics of Rigid Bodies", units: 3, prereqs: ["COE0009"] },
-          { id: "CE0002L", title: "Computer Fundamentals and Programming", units: 2, prereqs: [] },
-          { id: "CE0003L", title: "Engineering Drawing and Plans", units: 1, prereqs: [] },
-          { id: "CE0005", title: "Introduction to Civil Engineering", units: 2, prereqs: ["GED0006"] },
-          { id: "COE0019", title: "Differential Equations", units: 3, prereqs: ["COE0013"] },
-          { id: "GED0035", title: "The Contemporary World", units: 3, prereqs: [] },
-          { id: "GED0043", title: "Specialized English Program 3", units: 3, prereqs: ["GED0031"] },
-          { id: "GED0045", title: "G.E. Elective – Bioengineering", units: 3, prereqs: [] }
-        ]
+          { id: "CE0001", title: "Statics of Rigid Bodies for CE", units: 4, prereqs: ["COE0009"] },
+          { id: "CE0003", title: "Computer Fundamentals for CE (LEC)", units: 2, prereqs: [] },
+          { id: "CE0003L", title: "Computer Fundamentals for CE (Lab)", units: 1, prereqs: [] },
+          { id: "GED0004", title: "Physical Education 1", units: 3, prereqs: [] },
+          { id: "GED0005", title: "National Service Training Program 1", units: 3, prereqs: [] },
+        ],
       },
       {
         termName: "Term 2",
         courses: [
-          { id: "CE0007", title: "Dynamics of Rigid Bodies for CE", units: 2, prereqs: ["CE0001"] },
-          { id: "CE0009", title: "Fluid Mechanics (LEC)", units: 2, prereqs: ["CE0001"] },
+          { id: "CE0005", title: "Engineering Drawing for CE", units: 2, prereqs: ["CE0003L"] },
+          { id: "CE0007", title: "Mechanics of Fluids for CE", units: 4, prereqs: ["CE0001"] },
+          { id: "CE0009", title: "Fluid Mechanics (LEC)", units: 3, prereqs: ["CE0007"] },
           { id: "CE0009L", title: "Fluid Mechanics (Lab)", units: 1, prereqs: [] },
+          { id: "GED0011", title: "Science, Technology and Society", units: 3, prereqs: [] },
+        ],
+      },
+      {
+        termName: "Term 3",
+        courses: [
           { id: "CE0011L", title: "Computer-Aided Drafting for CE", units: 1, prereqs: ["CE0003L"] },
           { id: "CE0013", title: "Mechanics of Deformable Bodies for CE", units: 5, prereqs: ["CE0001"] },
           { id: "CE0015", title: "Fundamentals of Surveying (LEC)", units: 3, prereqs: ["CE0003L"] },
           { id: "CE0015L", title: "Fundamentals of Surveying (Lab)", units: 1, prereqs: [] },
           { id: "COE0057", title: "Design Thinking for Engineers", units: 3, prereqs: [] },
-          { id: "GED0085", title: "Gender and Society", units: 3, prereqs: [] }
-        ]
+          { id: "GED0085", title: "Gender and Society", units: 3, prereqs: [] },
+        ],
       },
-      {
-        termName: "Term 3",
-        courses: [
-          { id: "CE0017", title: "Building System Design (LEC)", units: 2, prereqs: ["CE0011L"] },
-          { id: "CE0017L", title: "Building System Design (Lab)", units: 1, prereqs: [] },
-          { id: "CE0019", title: "Structural Theory (LEC)", units: 3, prereqs: ["CE0013"] },
-          { id: "CE0019L", title: "Structural Theory (Lab)", units: 1, prereqs: [] },
-          { id: "CE0021", title: "Hydraulics (LEC)", units: 4, prereqs: ["CE0009"] },
-          { id: "CE0021L", title: "Hydraulics (Lab)", units: 1, prereqs: [] },
-          { id: "CE0023", title: "Highway and Railroad Engineering", units: 3, prereqs: ["CE0015"] },
-          { id: "CE0025", title: "CE Correlation Course 1 (LEC)", units: 2, prereqs: ["CE0013"] },
-          { id: "CE0025L", title: "CE Correlation Course 1 (Lab)", units: 1, prereqs: [] },
-          { id: "COE0039", title: "Engineering Economics", units: 3, prereqs: ["COE0011"] }
-        ]
-      }
-    ]
+    ],
   },
   {
     year: "Third Year",
@@ -113,15 +99,11 @@ const CURRICULUM_DATA = [
         courses: [
           { id: "CE0027", title: "Construction Materials and Testing (LEC)", units: 2, prereqs: ["CE0013"] },
           { id: "CE0027L", title: "Construction Materials and Testing (Lab)", units: 1, prereqs: [] },
-          { id: "CE0029", title: "Geotechnical Engineering 1 (LEC)", units: 3, prereqs: ["CE0013"] },
-          { id: "CE0029L", title: "Geotechnical Engineering 1 (Lab)", units: 1, prereqs: [] },
-          { id: "CE0031", title: "Hydrology", units: 3, prereqs: ["CE0021"] },
-          { id: "CE0033", title: "Quantity Surveying (LEC)", units: 2, prereqs: ["CE0017"] },
-          { id: "CE0033L", title: "Quantity Surveying (Lab)", units: 1, prereqs: [] },
-          { id: "CE0035", title: "Principle of Transportation Engineering", units: 3, prereqs: ["CE0023"] },
-          { id: "COE0049", title: "Engineering Management", units: 2, prereqs: ["COE0039"] },
-          { id: "GED0049", title: "Life and Works of Rizal", units: 3, prereqs: [] }
-        ]
+          { id: "CE0029", title: "Hydrology for CE", units: 3, prereqs: ["CE0009"] },
+          { id: "CE0031", title: "CE Statistics", units: 3, prereqs: ["COE0011"] },
+          { id: "CE0033", title: "Geotechnical Engineering 1", units: 3, prereqs: ["CE0013"] },
+          { id: "GED0037", title: "The Life and Works of Rizal", units: 3, prereqs: [] },
+        ],
       },
       {
         termName: "Term 2",
@@ -131,26 +113,23 @@ const CURRICULUM_DATA = [
           { id: "CE0039", title: "Principle of Steel Design (LEC)", units: 3, prereqs: ["CE0019"] },
           { id: "CE0039L", title: "Principle of Steel Design (Lab)", units: 1, prereqs: [] },
           { id: "CE0041", title: "Geology for Civil Engineers", units: 2, prereqs: ["CE0033"] },
-          { id: "GED0009", title: "Readings in Philippine History", units: 3, prereqs: [] },
-          { id: "GED0061", title: "Ethics", units: 3, prereqs: [] },
-          { id: "GED0063", title: "Technopreneurship", units: 3, prereqs: ["COE0049", "COE0057"] }
-        ]
+          { id: "CE0043", title: "Transportation Engineering 1", units: 3, prereqs: ["CE0015"] },
+        ],
       },
       {
         termName: "Term 3",
         courses: [
-          { id: "CE0043", title: "Professional Course 1 – Earthquake Engineering", units: 3, prereqs: ["CE0037", "CE0039"] },
-          { id: "CE0045", title: "Professional Course 2 – Reinforced Concrete Design", units: 3, prereqs: ["CE0037", "CE0039"] },
-          { id: "CE0047", title: "Numerical Solutions to CE Problems (LEC)", units: 2, prereqs: ["COE0019"] },
+          { id: "CE0045", title: "Hydraulics for CE", units: 3, prereqs: ["CE0029"] },
+          { id: "CE0047", title: "Numerical Solutions to CE Problems (LEC)", units: 2, prereqs: ["CE0031"] },
           { id: "CE0047L", title: "Numerical Solutions to CE Problems (Lab)", units: 1, prereqs: [] },
           { id: "CE0049", title: "Methods of Research", units: 3, prereqs: ["COE0049"] },
           { id: "CE0051", title: "CE Correlation Course 2 (LEC)", units: 2, prereqs: ["CE0037", "CE0039", "CE0025"] },
           { id: "CE0051L", title: "CE Correlation Course 2 (Lab)", units: 1, prereqs: [] },
           { id: "CE0053", title: "Engineering Utilities 1", units: 3, prereqs: ["COE0015"] },
-          { id: "GED0047", title: "Foreign Language", units: 3, prereqs: [] }
-        ]
-      }
-    ]
+          { id: "GED0047", title: "Foreign Language", units: 3, prereqs: [] },
+        ],
+      },
+    ],
   },
   {
     year: "Fourth Year",
@@ -167,14 +146,14 @@ const CURRICULUM_DATA = [
           { id: "CE0063", title: "Construction Methods and Project Management", units: 3, prereqs: ["COE0049"] },
           { id: "CE0065", title: "Engineering Utilities 2", units: 3, prereqs: ["CE0053"] },
           { id: "COE0061", title: "Professional Development for Engineers", units: 1, prereqs: ["CE0005"] },
-          { id: "GED0011", title: "Science, Technology and Society", units: 3, prereqs: [] }
-        ]
+          { id: "GED0011", title: "Science, Technology and Society", units: 3, prereqs: [] },
+        ],
       },
       {
         termName: "Term 2",
         courses: [
-          { id: "CE0067", title: "Internship for CE", units: 9, prereqs: ["CE0059", "CE0061"] }
-        ]
+          { id: "CE0067", title: "Internship for CE", units: 9, prereqs: ["CE0059", "CE0061"] },
+        ],
       },
       {
         termName: "Term 3",
@@ -185,11 +164,11 @@ const CURRICULUM_DATA = [
           { id: "CE0071L", title: "CE Project 2 (Lab)", units: 1, prereqs: [] },
           { id: "CE0073", title: "Professional Course 5 – Foundation and Retaining Wall", units: 3, prereqs: ["CE0067"] },
           { id: "CE0075", title: "Professional Course 6 – Computer Software in Structural Analysis", units: 3, prereqs: ["CE0067"] },
-          { id: "CE0077", title: "Technical Elective for CE - COSH", units: 3, prereqs: ["CE0067"] }
-        ]
-      }
-    ]
-  }
+          { id: "CE0077", title: "Technical Elective for CE - COSH", units: 3, prereqs: ["CE0067"] },
+        ],
+      },
+    ],
+  },
 ];
 
 const App = () => {
@@ -216,9 +195,18 @@ const App = () => {
     return !allPrereqsPassed;
   };
 
-  // safer prerequisite error message (no deep nested find that can crash)
-  const handleToggle = (courseId, currentStatus, locked) => {
-    if (locked && currentStatus === "inactive") {
+  // Co-requisite: if course id ends with "L", lecture is same id without "L"
+  const getCoreqLectureId = (courseId) => {
+    if (courseId.endsWith("L")) {
+      return courseId.slice(0, -1);
+    }
+    return null;
+  };
+
+  // Explicit status setter with prerequisite check
+  const setCourseStatusWithValidation = (courseId, targetStatus, locked) => {
+    // Only block when trying to move from inactive to active/passed and prereqs are not met
+    if (locked && (targetStatus === "taking" || targetStatus === "passed")) {
       const course = CURRICULUM_DATA.flatMap((y) =>
         y.terms.flatMap((t) => t.courses)
       ).find((c) => c.id === courseId);
@@ -229,14 +217,9 @@ const App = () => {
       return;
     }
 
-    let nextStatus = "inactive";
-    if (currentStatus === "inactive" || !currentStatus) nextStatus = "taking";
-    else if (currentStatus === "taking") nextStatus = "passed";
-    else if (currentStatus === "passed") nextStatus = "inactive";
-
     setCourseStatus((prev) => ({
       ...prev,
-      [courseId]: nextStatus,
+      [courseId]: targetStatus,
     }));
   };
 
@@ -265,7 +248,7 @@ const App = () => {
       );
       return acc + units;
     }
-    return acc;
+    return 0 + acc;
   }, 0);
 
   const percentage =
@@ -342,21 +325,15 @@ const App = () => {
                 className="w-full flex justify-between items-center px-6 py-4 bg-slate-50 hover:bg-slate-100 transition-colors border-b border-slate-100"
               >
                 <div className="flex items-center gap-3">
-                  <div
-                    className={`p-2 rounded-lg ${
-                      expandedYear === year.year
-                        ? "bg-blue-100 text-blue-700"
-                        : "bg-slate-200 text-slate-500"
-                    }`}
-                  >
-                    <BarChart3 className="w-5 h-5" />
+                  <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center">
+                    <BarChart3 className="w-4 h-4 text-blue-600" />
                   </div>
                   <div className="text-left">
-                    <h2 className="text-lg font-bold text-slate-800">
+                    <h2 className="font-semibold text-slate-800">
                       {year.year}
                     </h2>
-                    <p className="text-sm text-slate-500">
-                      {year.schoolYear}
+                    <p className="text-xs text-slate-500">
+                      Academic Year {year.schoolYear}
                     </p>
                   </div>
                 </div>
@@ -367,10 +344,10 @@ const App = () => {
                 />
               </button>
 
-              {/* Terms Grid */}
+              {/* Year Content */}
               {expandedYear === year.year && (
-                <div className="p-6 bg-slate-50/50">
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="px-4 pb-4 pt-3">
+                  <div className="grid md:grid-cols-3 gap-4">
                     {year.terms.map((term, tIdx) => (
                       <div key={tIdx} className="flex flex-col">
                         <div className="mb-3 flex justify-between items-end px-1">
@@ -390,33 +367,28 @@ const App = () => {
                           {term.courses.map((course) => {
                             const status = courseStatus[course.id] || "inactive";
                             const locked = isLocked(course);
+                            const coreqLectureId = getCoreqLectureId(course.id);
 
                             // --- CARD STYLING LOGIC ---
                             let baseStyle =
-                              "relative p-4 rounded-xl border transition-all duration-200 cursor-pointer flex justify-between items-start group shadow-sm ";
+                              "relative p-4 rounded-xl border transition-all duration-200 flex justify-between items-start group shadow-sm ";
 
                             if (status === "passed") {
                               baseStyle +=
-                                "bg-white border-blue-200 hover:shadow-md hover:border-blue-400";
+                                "bg-blue-50 border-blue-200 shadow-md";
                             } else if (status === "taking") {
                               baseStyle +=
-                                "bg-blue-600 border-blue-600 text-white shadow-lg scale-[1.02] z-10";
+                                "bg-white border-blue-200 hover:shadow-md hover:border-blue-400";
                             } else if (locked) {
                               baseStyle +=
-                                "bg-slate-100 border-slate-200 opacity-60 cursor-not-allowed grayscale";
+                                "bg-slate-100 border-slate-200 opacity-60 grayscale";
                             } else {
                               baseStyle +=
                                 "bg-white border-slate-200 hover:border-blue-300 hover:shadow-md";
                             }
 
                             return (
-                              <div
-                                key={course.id}
-                                onClick={() =>
-                                  handleToggle(course.id, status, locked)
-                                }
-                                className={baseStyle}
-                              >
+                              <div key={course.id} className={baseStyle}>
                                 <div className="flex-1 pr-3">
                                   {/* Header Badge */}
                                   <div className="flex items-center gap-2 mb-1.5">
@@ -439,7 +411,7 @@ const App = () => {
                                     className={`text-sm font-semibold leading-snug 
                                     ${
                                       status === "taking"
-                                        ? "text-white"
+                                        ? "text-slate-900"
                                         : "text-slate-700"
                                     }`}
                                   >
@@ -451,7 +423,7 @@ const App = () => {
                                     <span
                                       className={`text-xs ${
                                         status === "taking"
-                                          ? "text-blue-100"
+                                          ? "text-blue-700"
                                           : "text-slate-400"
                                       }`}
                                     >
@@ -464,6 +436,70 @@ const App = () => {
                                       </span>
                                     )}
                                   </div>
+
+                                  {/* Co-requisite info for lab courses */}
+                                  {coreqLectureId && (
+                                    <div className="mt-1 text-[10px] text-blue-600 bg-blue-50 inline-flex items-center px-2 py-0.5 rounded-full">
+                                      Co-requisite: {coreqLectureId}
+                                    </div>
+                                  )}
+
+                                  {/* Status control buttons */}
+                                  <div className="mt-3 flex flex-wrap gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setCourseStatusWithValidation(
+                                          course.id,
+                                          "inactive",
+                                          locked
+                                        )
+                                      }
+                                      className={`text-[10px] px-2 py-1 rounded-full border transition ${
+                                        status === "inactive"
+                                          ? "bg-slate-800 text-white border-slate-800"
+                                          : "bg-white text-slate-600 border-slate-300 hover:bg-slate-50"
+                                      }`}
+                                    >
+                                      Inactive / Failed
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setCourseStatusWithValidation(
+                                          course.id,
+                                          "taking",
+                                          locked
+                                        )
+                                      }
+                                      className={`text-[10px] px-2 py-1 rounded-full border transition ${
+                                        status === "taking"
+                                          ? "bg-blue-600 text-white border-blue-600"
+                                          : "bg-white text-blue-700 border-blue-300 hover:bg-blue-50"
+                                      } ${locked ? "opacity-60 cursor-not-allowed" : ""}`}
+                                      disabled={locked}
+                                    >
+                                      Active
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setCourseStatusWithValidation(
+                                          course.id,
+                                          "passed",
+                                          locked
+                                        )
+                                      }
+                                      className={`text-[10px] px-2 py-1 rounded-full border transition ${
+                                        status === "passed"
+                                          ? "bg-green-600 text-white border-green-600"
+                                          : "bg-white text-green-700 border-green-300 hover:bg-green-50"
+                                      } ${locked ? "opacity-60 cursor-not-allowed" : ""}`}
+                                      disabled={locked}
+                                    >
+                                      Passed
+                                    </button>
+                                  </div>
                                 </div>
 
                                 {/* Status Icon */}
@@ -475,7 +511,7 @@ const App = () => {
                                   )}
                                   {status === "taking" && (
                                     <div className="bg-white/20 p-1 rounded-full">
-                                      <BookOpen className="w-4 h-4 text-white" />
+                                      <BookOpen className="w-4 h-4 text-blue-600" />
                                     </div>
                                   )}
                                   {locked && (
