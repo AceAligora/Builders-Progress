@@ -328,6 +328,50 @@ const App = () => {
     });
   };
 
+  // NEW: Mark all courses in a year as passed
+  const markYearAsPassed = (year) => {
+    setCourseStatus((prev) => {
+      const next = { ...prev };
+
+      year.terms.forEach((term) => {
+        term.courses.forEach((course) => {
+          const autoLab = isAutoSyncedLabId(course.id);
+          const locked = isLocked(course);
+          if (!autoLab && !locked) {
+            next[course.id] = "passed";
+          }
+        });
+      });
+
+      const synced = syncLabsWithLectures(next);
+
+      if (Object.keys(synced).length === Object.keys(prev).length) {
+        setErrorMsg(
+          "No additional subjects in this year can be marked as passed yet."
+        );
+        setTimeout(() => setErrorMsg(""), 3000);
+      }
+
+      return synced;
+    });
+  };
+
+  // NEW: Reset all courses in a year to inactive
+  const resetYear = (year) => {
+    setCourseStatus((prev) => {
+      const next = { ...prev };
+
+      year.terms.forEach((term) => {
+        term.courses.forEach((course) => {
+          next[course.id] = "inactive";
+        });
+      });
+
+      const synced = syncLabsWithLectures(next);
+      return synced;
+    });
+  };
+
   const totalUnits = CURRICULUM_DATA.reduce(
     (acc, year) =>
       acc +
@@ -438,15 +482,15 @@ const App = () => {
                 key={yIdx}
                 className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"
               >
-                <button
-                  onClick={() =>
-                    setExpandedYear(
-                      expandedYear === year.year ? null : year.year
-                    )
-                  }
-                  className="w-full flex justify-between items-center px-6 py-4 bg-slate-50 hover:bg-slate-100 transition-colors border-b border-slate-100"
-                >
-                  <div className="flex items-center gap-3">
+                <div className="w-full flex justify-between items-center px-6 py-4 bg-slate-50 hover:bg-slate-100 transition-colors border-b border-slate-100">
+                  <button
+                    onClick={() =>
+                      setExpandedYear(
+                        expandedYear === year.year ? null : year.year
+                      )
+                    }
+                    className="flex items-center gap-3"
+                  >
                     <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center">
                       <BarChart3 className="w-4 h-4 text-blue-600" />
                     </div>
@@ -455,13 +499,31 @@ const App = () => {
                         {year.year}
                       </h2>
                     </div>
+                    <ChevronRight
+                      className={`w-5 h-5 text-slate-400 transition-transform ${
+                        expandedYear === year.year ? "rotate-90" : ""
+                      }`}
+                    />
+                  </button>
+
+                  {/* NEW: Year-level controls */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => markYearAsPassed(year)}
+                      className="text-[11px] px-3 py-1 rounded-full border border-green-500 text-green-700 bg-green-50 hover:bg-green-100 transition"
+                    >
+                      Mark all courses this year as passed
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => resetYear(year)}
+                      className="text-[11px] px-3 py-1 rounded-full border border-slate-300 text-slate-600 bg-white hover:bg-slate-50 transition"
+                    >
+                      Reset this year
+                    </button>
                   </div>
-                  <ChevronRight
-                    className={`w-5 h-5 text-slate-400 transition-transform ${
-                      expandedYear === year.year ? "rotate-90" : ""
-                    }`}
-                  />
-                </button>
+                </div>
 
                 {expandedYear === year.year && (
                   <div className="px-4 pb-4 pt-3">
@@ -732,7 +794,7 @@ const App = () => {
                   the overall progress bar more reliable and visible.
                 </li>
                 <li>
-                  <strong>v18:</strong> Added term-level controls: “Mark all
+                  <strong>v18:</strong> Added term-level and year-level controls: “Mark all
                   courses this term as passed” and “Reset this term”, with
                   automatic updates to dependent laboratory courses.
                 </li>
