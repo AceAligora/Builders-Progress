@@ -203,7 +203,7 @@ const buildCourseIdSet = () => {
 
 const ALL_COURSE_IDS = buildCourseIdSet();
 
-// A lab is auto-synced if its ID ends with "L" and a lecture with same code minus "L" exists.
+// A lab is auto-synced if there exists a lecture with same code minus 'L'
 const isAutoSyncedLabId = (courseId) => {
   if (!courseId.endsWith("L")) return false;
   const lectureId = courseId.slice(0, -1);
@@ -241,8 +241,7 @@ const App = () => {
     return !allPrereqsPassed;
   };
 
-  // Sync auto labs with their lecture:
-  // - lecture inactive OR taking OR passed -> lab gets the same status
+  // Sync auto labs so they always mirror their lecture (inactive/taking/passed)
   const syncLabsWithLectures = (statusMap) => {
     const updated = { ...statusMap };
 
@@ -252,10 +251,7 @@ const App = () => {
           if (isAutoSyncedLabId(course.id)) {
             const lectureId = getCoreqLectureId(course.id);
             if (!lectureId) return;
-
             const lectureStatus = updated[lectureId] || "inactive";
-
-            // Mirror whatever lecture has (inactive/taking/passed)
             updated[course.id] = lectureStatus;
           }
         })
@@ -300,8 +296,6 @@ const App = () => {
       term.courses.forEach((course) => {
         const autoLab = isAutoSyncedLabId(course.id);
         const locked = isLocked(course);
-
-        // Only set things we can change; auto labs will sync afterwards
         if (!autoLab && !locked) {
           next[course.id] = "passed";
         }
@@ -357,7 +351,7 @@ const App = () => {
   const barWidth = percentage === 0 ? 0 : Math.max(4, percentage);
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-800">
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-800 flex flex-col">
       <Analytics />
       <SpeedInsights />
 
@@ -395,281 +389,336 @@ const App = () => {
       </div>
 
       {/* MAIN CONTENT */}
-      <div className="max-w-6xl mx-auto px-4 -mt-16 pb-20">
-        {errorMsg && (
-          <div className="fixed top-6 left-1/2 transform -translate-x-1/2 bg-white border-l-4 border-red-500 text-slate-700 px-6 py-4 rounded-r shadow-2xl z-50 flex items-center">
-            <AlertCircle className="w-5 h-5 mr-3 text-red-500" />
-            <span className="font-medium">{errorMsg}</span>
-          </div>
-        )}
+      <div className="flex-1 w-full">
+        <div className="max-w-6xl mx-auto px-4 -mt-16 pb-12">
+          {errorMsg && (
+            <div className="fixed top-6 left-1/2 transform -translate-x-1/2 bg-white border-l-4 border-red-500 text-slate-700 px-6 py-4 rounded-r shadow-2xl z-50 flex items-center">
+              <AlertCircle className="w-5 h-5 mr-3 text-red-500" />
+              <span className="font-medium">{errorMsg}</span>
+            </div>
+          )}
 
-        {/* --- PROGRESS BAR --- */}
-        <div className="bg-white rounded-lg p-1 mb-8 shadow-md">
-          <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-700 ease-out"
-              style={{ width: `${barWidth}%`, maxWidth: "100%" }}
-            />
+          {/* --- PROGRESS BAR (wrapped in flex to avoid layout issues) --- */}
+          <div className="bg-white rounded-lg p-3 mb-8 shadow-md flex flex-col gap-2">
+            <div className="flex justify-between items-center text-xs text-slate-500">
+              <span>Overall Progress</span>
+              <span>{percentage}%</span>
+            </div>
+            <div className="relative h-3 w-full bg-slate-100 rounded-full overflow-hidden">
+              {/* Fallback inner track so something is always visible */}
+              <div className="absolute inset-0 bg-slate-100" />
+              <div
+                className="relative h-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-700 ease-out"
+                style={{
+                  width: `${barWidth}%`,
+                  maxWidth: "100%",
+                  minWidth: barWidth > 0 ? "8px" : "0px",
+                }}
+              />
+            </div>
+          </div>
+
+          {/* --- CURRICULUM DISPLAY --- */}
+          <div className="space-y-6">
+            {CURRICULUM_DATA.map((year, yIdx) => (
+              <div
+                key={yIdx}
+                className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"
+              >
+                <button
+                  onClick={() =>
+                    setExpandedYear(
+                      expandedYear === year.year ? null : year.year
+                    )
+                  }
+                  className="w-full flex justify-between items-center px-6 py-4 bg-slate-50 hover:bg-slate-100 transition-colors border-b border-slate-100"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center">
+                      <BarChart3 className="w-4 h-4 text-blue-600" />
+                    </div>
+                    <div className="text-left">
+                      <h2 className="font-semibold text-slate-800">
+                        {year.year}
+                      </h2>
+                    </div>
+                  </div>
+                  <ChevronRight
+                    className={`w-5 h-5 text-slate-400 transition-transform ${
+                      expandedYear === year.year ? "rotate-90" : ""
+                    }`}
+                  />
+                </button>
+
+                {expandedYear === year.year && (
+                  <div className="px-4 pb-4 pt-3">
+                    <div className="grid md:grid-cols-3 gap-4">
+                      {year.terms.map((term, tIdx) => (
+                        <div key={tIdx} className="flex flex-col">
+                          <div className="mb-3 flex justify-between items-center px-1">
+                            <div>
+                              <h3 className="font-semibold text-slate-700 uppercase tracking-wide text-sm">
+                                {term.termName}
+                              </h3>
+                              <p className="text-[11px] text-slate-400">
+                                {term.courses.reduce(
+                                  (acc, c) => acc + c.units,
+                                  0
+                                )}
+                                u total
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => markTermAsPassed(term)}
+                              className="text-[10px] px-2 py-1 rounded-full border border-green-500 text-green-700 bg-green-50 hover:bg-green-100 transition"
+                            >
+                              Mark all subjects this term as passed
+                            </button>
+                          </div>
+
+                          <div className="space-y-3 flex-grow">
+                            {term.courses.map((course) => {
+                              const status =
+                                courseStatus[course.id] || "inactive";
+                              const autoSyncedLab = isAutoSyncedLabId(
+                                course.id
+                              );
+                              const lab = isLabCourse(course);
+                              const locked = isLocked(course);
+                              const coreqLectureId =
+                                autoSyncedLab && getCoreqLectureId(course.id);
+
+                              let baseStyle =
+                                "relative p-4 rounded-xl border transition-all duration-200 flex justify-between items-start group shadow-sm ";
+
+                              if (status === "passed") {
+                                baseStyle +=
+                                  "bg-blue-50 border-blue-200 shadow-md";
+                              } else if (status === "taking") {
+                                baseStyle +=
+                                  "bg-white border-blue-200 hover:shadow-md hover:border-blue-400";
+                              } else if (locked && autoSyncedLab) {
+                                baseStyle +=
+                                  "bg-slate-100 border-slate-200 opacity-60 grayscale";
+                              } else if (locked) {
+                                baseStyle +=
+                                  "bg-slate-100 border-slate-200 opacity-60";
+                              } else {
+                                baseStyle +=
+                                  "bg-white border-slate-200 hover:border-blue-300 hover:shadow-md";
+                              }
+
+                              return (
+                                <div key={course.id} className={baseStyle}>
+                                  <div className="flex-1 pr-3">
+                                    <div className="flex items-center gap-2 mb-1.5">
+                                      <span
+                                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full tracking-wider
+                                        ${
+                                          status === "taking"
+                                            ? "bg-blue-500 text-blue-50"
+                                            : status === "passed"
+                                            ? "bg-green-100 text-green-700"
+                                            : "bg-slate-100 text-slate-500"
+                                        }`}
+                                      >
+                                        {course.id}
+                                      </span>
+                                      {lab && (
+                                        <span className="text-[9px] uppercase tracking-wide bg-slate-800 text-slate-50 px-1.5 py-0.5 rounded-full">
+                                          Laboratory
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    <h4
+                                      className={`text-sm font-semibold leading-snug 
+                                      ${
+                                        status === "taking"
+                                          ? "text-slate-900"
+                                          : "text-slate-700"
+                                      }`}
+                                    >
+                                      {course.title}
+                                    </h4>
+
+                                    <div className="mt-2 flex items-center gap-2">
+                                      <span
+                                        className={`text-xs ${
+                                          status === "taking"
+                                            ? "text-blue-700"
+                                            : "text-slate-400"
+                                        }`}
+                                      >
+                                        {course.units} Units
+                                      </span>
+                                      {locked &&
+                                        !autoSyncedLab &&
+                                        course.prereqs.length > 0 && (
+                                          <span className="text-[10px] text-red-500 flex items-center bg-red-50 px-1 rounded">
+                                            <Lock className="w-3 h-3 mr-1" />
+                                            Req: {course.prereqs[0]}
+                                          </span>
+                                        )}
+                                    </div>
+
+                                    {autoSyncedLab && coreqLectureId && (
+                                      <div className="mt-1 text-[10px] text-blue-600 bg-blue-50 inline-flex items-center px-2 py-0.5 rounded-full">
+                                        Co-requisite: {coreqLectureId}
+                                      </div>
+                                    )}
+
+                                    <div className="mt-3 flex flex-wrap gap-1.5">
+                                      {autoSyncedLab ? (
+                                        <span className="text-[10px] text-slate-500 italic">
+                                          Laboratory status follows its Lecture
+                                          co-requisite.
+                                        </span>
+                                      ) : (
+                                        <>
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              setCourseStatusWithValidation(
+                                                course.id,
+                                                "inactive",
+                                                locked
+                                              )
+                                            }
+                                            className={`text-[10px] px-2 py-1 rounded-full border transition ${
+                                              status === "inactive"
+                                                ? "bg-slate-800 text-white border-slate-800"
+                                                : "bg-white text-slate-600 border-slate-300 hover:bg-slate-50"
+                                            }`}
+                                          >
+                                            Inactive / Failed
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              setCourseStatusWithValidation(
+                                                course.id,
+                                                "taking",
+                                                locked
+                                              )
+                                            }
+                                            className={`text-[10px] px-2 py-1 rounded-full border transition ${
+                                              status === "taking"
+                                                ? "bg-blue-600 text-white border-blue-600"
+                                                : "bg-white text-blue-700 border-blue-300 hover:bg-blue-50"
+                                            } ${
+                                              locked
+                                                ? "opacity-60 cursor-not-allowed"
+                                                : ""
+                                            }`}
+                                            disabled={locked}
+                                          >
+                                            Active
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              setCourseStatusWithValidation(
+                                                course.id,
+                                                "passed",
+                                                locked
+                                              )
+                                            }
+                                            className={`text-[10px] px-2 py-1 rounded-full border transition ${
+                                              status === "passed"
+                                                ? "bg-green-600 text-white border-green-600"
+                                                : "bg-white text-green-700 border-green-300 hover:bg-green-50"
+                                            } ${
+                                              locked
+                                                ? "opacity-60 cursor-not-allowed"
+                                                : ""
+                                            }`}
+                                            disabled={locked}
+                                          >
+                                            Passed
+                                          </button>
+                                        </>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  <div className="mt-1">
+                                    {status === "passed" && (
+                                      <div className="bg-blue-100 p-1 rounded-full">
+                                        <Check className="w-4 h-4 text-blue-600" />
+                                      </div>
+                                    )}
+                                    {status === "taking" && (
+                                      <div className="bg-white/20 p-1 rounded-full">
+                                        <BookOpen className="w-4 h-4 text-blue-600" />
+                                      </div>
+                                    )}
+                                    {(locked || autoSyncedLab) && (
+                                      <Lock className="w-4 h-4 text-slate-400" />
+                                    )}
+                                    {status === "inactive" &&
+                                      !locked &&
+                                      !autoSyncedLab && (
+                                        <div className="w-6 h-6 rounded-full border-2 border-slate-200 group-hover:border-blue-300"></div>
+                                      )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* --- CURRICULUM DISPLAY --- */}
-        <div className="space-y-6">
-          {CURRICULUM_DATA.map((year, yIdx) => (
-            <div
-              key={yIdx}
-              className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"
-            >
-              <button
-                onClick={() =>
-                  setExpandedYear(
-                    expandedYear === year.year ? null : year.year
-                  )
-                }
-                className="w-full flex justify-between items-center px-6 py-4 bg-slate-50 hover:bg-slate-100 transition-colors border-b border-slate-100"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center">
-                    <BarChart3 className="w-4 h-4 text-blue-600" />
-                  </div>
-                  <div className="text-left">
-                    <h2 className="font-semibold text-slate-800">
-                      {year.year}
-                    </h2>
-                  </div>
-                </div>
-                <ChevronRight
-                  className={`w-5 h-5 text-slate-400 transition-transform ${
-                    expandedYear === year.year ? "rotate-90" : ""
-                  }`}
-                />
-              </button>
+        {/* PATCH NOTES + FOOTER */}
+        <div className="w-full border-t border-slate-200 bg-slate-50/80">
+          <div className="max-w-6xl mx-auto px-4 py-6 space-y-4 text-sm text-slate-600">
+            {/* Patch notes */}
+            <section>
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
+                Patch Notes
+              </h2>
+              <ul className="text-xs space-y-1 list-disc pl-4">
+                <li>
+                  Added dedicated status buttons (Inactive / Failed, Active,
+                  Passed) for each subject.
+                </li>
+                <li>
+                  Laboratory subjects with a matching Lecture now automatically
+                  mirror the Lecture status (Inactive, Active, Passed).
+                </li>
+                <li>
+                  Independent laboratory subjects (e.g., CE0002L, CE0003L,
+                  CE0011L) can now be managed separately with their own status
+                  buttons.
+                </li>
+                <li>
+                  Improved progress bar reliability and visibility for overall
+                  curriculum completion.
+                </li>
+                <li>
+                  Added Vercel Analytics and Speed Insights integration for
+                  performance and usage tracking.
+                </li>
+              </ul>
+            </section>
 
-              {expandedYear === year.year && (
-                <div className="px-4 pb-4 pt-3">
-                  <div className="grid md:grid-cols-3 gap-4">
-                    {year.terms.map((term, tIdx) => (
-                      <div key={tIdx} className="flex flex-col">
-                        <div className="mb-3 flex justify-between items-center px-1">
-                          <div>
-                            <h3 className="font-semibold text-slate-700 uppercase tracking-wide text-sm">
-                              {term.termName}
-                            </h3>
-                            <p className="text-[11px] text-slate-400">
-                              {term.courses.reduce(
-                                (acc, c) => acc + c.units,
-                                0
-                              )}
-                              u total
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => markTermAsPassed(term)}
-                            className="text-[10px] px-2 py-1 rounded-full border border-green-500 text-green-700 bg-green-50 hover:bg-green-100 transition"
-                          >
-                            Mark all subjects this term as passed
-                          </button>
-                        </div>
-
-                        <div className="space-y-3 flex-grow">
-                          {term.courses.map((course) => {
-                            const status =
-                              courseStatus[course.id] || "inactive";
-                            const autoSyncedLab = isAutoSyncedLabId(
-                              course.id
-                            );
-                            const lab = isLabCourse(course);
-                            const locked = isLocked(course);
-                            const coreqLectureId =
-                              autoSyncedLab && getCoreqLectureId(course.id);
-
-                            let baseStyle =
-                              "relative p-4 rounded-xl border transition-all duration-200 flex justify-between items-start group shadow-sm ";
-
-                            if (status === "passed") {
-                              baseStyle +=
-                                "bg-blue-50 border-blue-200 shadow-md";
-                            } else if (status === "taking") {
-                              baseStyle +=
-                                "bg-white border-blue-200 hover:shadow-md hover:border-blue-400";
-                            } else if (locked && autoSyncedLab) {
-                              // Auto lab but inactive -> greyed
-                              baseStyle +=
-                                "bg-slate-100 border-slate-200 opacity-60 grayscale";
-                            } else if (locked) {
-                              baseStyle +=
-                                "bg-slate-100 border-slate-200 opacity-60";
-                            } else {
-                              baseStyle +=
-                                "bg-white border-slate-200 hover:border-blue-300 hover:shadow-md";
-                            }
-
-                            return (
-                              <div key={course.id} className={baseStyle}>
-                                <div className="flex-1 pr-3">
-                                  <div className="flex items-center gap-2 mb-1.5">
-                                    <span
-                                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full tracking-wider
-                                      ${
-                                        status === "taking"
-                                          ? "bg-blue-500 text-blue-50"
-                                          : status === "passed"
-                                          ? "bg-green-100 text-green-700"
-                                          : "bg-slate-100 text-slate-500"
-                                      }`}
-                                    >
-                                      {course.id}
-                                    </span>
-                                    {lab && (
-                                      <span className="text-[9px] uppercase tracking-wide bg-slate-800 text-slate-50 px-1.5 py-0.5 rounded-full">
-                                        Laboratory
-                                      </span>
-                                    )}
-                                  </div>
-
-                                  <h4
-                                    className={`text-sm font-semibold leading-snug 
-                                    ${
-                                      status === "taking"
-                                        ? "text-slate-900"
-                                        : "text-slate-700"
-                                    }`}
-                                  >
-                                    {course.title}
-                                  </h4>
-
-                                  <div className="mt-2 flex items-center gap-2">
-                                    <span
-                                      className={`text-xs ${
-                                        status === "taking"
-                                          ? "text-blue-700"
-                                          : "text-slate-400"
-                                      }`}
-                                    >
-                                      {course.units} Units
-                                    </span>
-                                    {locked &&
-                                      !autoSyncedLab &&
-                                      course.prereqs.length > 0 && (
-                                        <span className="text-[10px] text-red-500 flex items-center bg-red-50 px-1 rounded">
-                                          <Lock className="w-3 h-3 mr-1" />
-                                          Req: {course.prereqs[0]}
-                                        </span>
-                                      )}
-                                  </div>
-
-                                  {autoSyncedLab && coreqLectureId && (
-                                    <div className="mt-1 text-[10px] text-blue-600 bg-blue-50 inline-flex items-center px-2 py-0.5 rounded-full">
-                                      Co-requisite: {coreqLectureId}
-                                    </div>
-                                  )}
-
-                                  <div className="mt-3 flex flex-wrap gap-1.5">
-                                    {autoSyncedLab ? (
-                                      <span className="text-[10px] text-slate-500 italic">
-                                        Laboratory status follows its Lecture
-                                        co-requisite.
-                                      </span>
-                                    ) : (
-                                      <>
-                                        <button
-                                          type="button"
-                                          onClick={() =>
-                                            setCourseStatusWithValidation(
-                                              course.id,
-                                              "inactive",
-                                              locked
-                                            )
-                                          }
-                                          className={`text-[10px] px-2 py-1 rounded-full border transition ${
-                                            status === "inactive"
-                                              ? "bg-slate-800 text-white border-slate-800"
-                                              : "bg-white text-slate-600 border-slate-300 hover:bg-slate-50"
-                                          }`}
-                                        >
-                                          Inactive / Failed
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={() =>
-                                            setCourseStatusWithValidation(
-                                              course.id,
-                                              "taking",
-                                              locked
-                                            )
-                                          }
-                                          className={`text-[10px] px-2 py-1 rounded-full border transition ${
-                                            status === "taking"
-                                              ? "bg-blue-600 text-white border-blue-600"
-                                              : "bg-white text-blue-700 border-blue-300 hover:bg-blue-50"
-                                          } ${
-                                            locked
-                                              ? "opacity-60 cursor-not-allowed"
-                                              : ""
-                                          }`}
-                                          disabled={locked}
-                                        >
-                                          Active
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={() =>
-                                            setCourseStatusWithValidation(
-                                              course.id,
-                                              "passed",
-                                              locked
-                                            )
-                                          }
-                                          className={`text-[10px] px-2 py-1 rounded-full border transition ${
-                                            status === "passed"
-                                              ? "bg-green-600 text-white border-green-600"
-                                              : "bg-white text-green-700 border-green-300 hover:bg-green-50"
-                                          } ${
-                                            locked
-                                              ? "opacity-60 cursor-not-allowed"
-                                              : ""
-                                          }`}
-                                          disabled={locked}
-                                        >
-                                          Passed
-                                        </button>
-                                      </>
-                                    )}
-                                  </div>
-                                </div>
-
-                                <div className="mt-1">
-                                  {status === "passed" && (
-                                    <div className="bg-blue-100 p-1 rounded-full">
-                                      <Check className="w-4 h-4 text-blue-600" />
-                                    </div>
-                                  )}
-                                  {status === "taking" && (
-                                    <div className="bg-white/20 p-1 rounded-full">
-                                      <BookOpen className="w-4 h-4 text-blue-600" />
-                                    </div>
-                                  )}
-                                  {(locked || autoSyncedLab) && (
-                                    <Lock className="w-4 h-4 text-slate-400" />
-                                  )}
-                                  {status === "inactive" &&
-                                    !locked &&
-                                    !autoSyncedLab && (
-                                      <div className="w-6 h-6 rounded-full border-2 border-slate-200 group-hover:border-blue-300"></div>
-                                    )}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
+            {/* Footer disclaimer */}
+            <footer className="pt-2 border-t border-slate-200 text-[11px] text-slate-500">
+              <p className="leading-relaxed">
+                This is a personal and on-going project, and it's not affiliated
+                with FEU Institute of Technology nor the FEU Tech Civil
+                Engineering Department.
+              </p>
+            </footer>
+          </div>
         </div>
       </div>
     </div>
