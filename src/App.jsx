@@ -345,7 +345,6 @@ const App = () => {
 
       const synced = syncLabsWithLectures(next);
 
-      // Optional: message if nothing actually changed
       const changed = Object.keys(synced).some(
         (key) => synced[key] !== prev[key]
       );
@@ -388,7 +387,8 @@ const App = () => {
     0
   );
 
-  const passedUnits = Object.keys(courseStatus).reduce((acc, id) => {
+  // Units completed = units where status is "passed"
+  const completedUnits = Object.keys(courseStatus).reduce((acc, id) => {
     if (courseStatus[id] === "passed") {
       let units = 0;
       CURRICULUM_DATA.forEach((y) =>
@@ -403,9 +403,27 @@ const App = () => {
     return acc;
   }, 0);
 
+  // Units active = units where status is "taking"
+  const activeUnits = Object.keys(courseStatus).reduce((acc, id) => {
+    if (courseStatus[id] === "taking") {
+      let units = 0;
+      CURRICULUM_DATA.forEach((y) =>
+        y.terms.forEach((t) =>
+          t.courses.forEach((c) => {
+            if (c.id === id) units = c.units;
+          })
+        )
+      );
+      return acc + units;
+    }
+    return acc;
+  }, 0);
+
+  const remainingUnits = Math.max(totalUnits - completedUnits, 0);
+
   let percentage = 0;
   if (totalUnits > 0) {
-    percentage = Math.round((passedUnits / totalUnits) * 100);
+    percentage = Math.round((completedUnits / totalUnits) * 100);
     if (Number.isNaN(percentage)) percentage = 0;
     if (percentage < 0) percentage = 0;
     if (percentage > 100) percentage = 100;
@@ -419,7 +437,7 @@ const App = () => {
 
       {/* --- HERO HEADER --- */}
       <div className="bg-blue-900 text-white pb-24 pt-10 px-6 shadow-xl">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center">
+        <div className="max-w-6xl mx-auto flex flex-col gap-6 md:flex-row md:justify-between md:items-center">
           <div>
             <div className="flex items-center gap-3 mb-2">
               <GraduationCap className="w-8 h-8 text-blue-200" />
@@ -432,18 +450,30 @@ const App = () => {
             </p>
           </div>
 
-          <div className="mt-6 md:mt-0 flex gap-8 bg-gradient-to-r from-blue-800 via-blue-700 to-blue-600 p-4 rounded-xl border border-blue-300/50 backdrop-blur-sm">
-            <div className="text-center">
-              <span className="block text-3xl font-bold">{passedUnits}</span>
-              <span className="text-xs uppercase tracking-wider text-blue-100">
-                Units Earned
+          {/* Summary stats */}
+          <div className="grid grid-cols-3 gap-4 bg-gradient-to-r from-blue-800 via-blue-700 to-blue-600 p-4 rounded-xl border border-blue-300/50 backdrop-blur-sm text-center text-xs md:text-sm">
+            <div>
+              <span className="block text-lg md:text-2xl font-bold">
+                {completedUnits}
+              </span>
+              <span className="uppercase tracking-wider text-blue-100">
+                Units Completed
               </span>
             </div>
-            <div className="w-px bg-blue-300/60"></div>
-            <div className="text-center">
-              <span className="block text-3xl font-bold">{percentage}%</span>
-              <span className="text-xs uppercase tracking-wider text-blue-100">
-                Complete
+            <div className="border-x border-blue-300/60 px-3">
+              <span className="block text-lg md:text-2xl font-bold">
+                {activeUnits}
+              </span>
+              <span className="uppercase tracking-wider text-blue-100">
+                Units Active
+              </span>
+            </div>
+            <div>
+              <span className="block text-lg md:text-2xl font-bold">
+                {remainingUnits}
+              </span>
+              <span className="uppercase tracking-wider text-blue-100">
+                Units Remaining
               </span>
             </div>
           </div>
@@ -799,8 +829,13 @@ const App = () => {
                 </li>
                 <li>
                   <strong>v18:</strong> Added term-level and year-level controls: “Mark all
-                  courses this term as passed” and “Reset this term”, with
-                  automatic updates to dependent laboratory courses.
+                  courses this term as passed”, “Reset this term”, “Mark all
+                  courses this year as passed”, and “Reset this year”.
+                </li>
+                <li>
+                  <strong>v19:</strong> Updated header statistics to show Units
+                  Completed, Units Active, and Units Remaining; completion
+                  percentage and progress bar now reflect completed units only.
                 </li>
                 <li>
                   Future versions will focus on UI refinements, export/backup
