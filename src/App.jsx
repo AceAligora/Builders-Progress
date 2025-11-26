@@ -9,11 +9,10 @@ import {
   GraduationCap,
 } from "lucide-react";
 
-// --- DATA: Full Civil Engineering Curriculum ---
+// --- DATA: Full Civil Engineering Curriculum (FEU Tech BSCE) ---
 const CURRICULUM_DATA = [
   {
     year: "First Year",
-    schoolYear: "2023 - 2024",
     terms: [
       {
         termName: "Term 1",
@@ -22,17 +21,17 @@ const CURRICULUM_DATA = [
           { id: "COE0003", title: "Engineering Mathematics 2", units: 3, prereqs: [] },
           { id: "COE0005", title: "Chemistry for Engineers 1", units: 3, prereqs: [] },
           { id: "GED0001", title: "Specialized English Program 1", units: 3, prereqs: [] },
-          { id: "GED0003", title: "Purposive Communication", units: 3, prereqs: [] },
-          { id: "GED0007", title: "Readings in Philippine History", units: 3, prereqs: [] },
-          { id: "GED0009", title: "The Contemporary World", units: 3, prereqs: [] },
-          { id: "GED0013", title: "Understanding the Physical Self", units: 3, prereqs: [] },
+          { id: "GED0004", title: "Physical Education 1", units: 3, prereqs: [] },
+          { id: "GED0006", title: "Personal and Professional Effectiveness", units: 2, prereqs: [] },
+          { id: "GED0007", title: "Art Appreciation", units: 3, prereqs: [] },
+          { id: "NSTP1", title: "Civic Welfare Training Service 1", units: 0, prereqs: [] },
         ],
       },
       {
         termName: "Term 2",
         courses: [
-          { id: "COE0007", title: "Engineering Mathematics 3", units: 3, prereqs: ["COE0001"] },
-          { id: "COE0009", title: "Physics for Engineers 1 (LEC)", units: 3, prereqs: ["COE0001"] },
+          { id: "COE0007", title: "Calculus 1", units: 3, prereqs: ["COE0001", "COE0003"] },
+          { id: "COE0009", title: "Physics for Engineers 1 (LEC)", units: 2, prereqs: ["COE0001", "COE0003"] },
           { id: "COE0009L", title: "Physics for Engineers 1 (Lab)", units: 1, prereqs: [] },
           { id: "GED0015", title: "Physical Education 2", units: 3, prereqs: ["GED0004"] },
           { id: "GED0019", title: "Understanding the Self", units: 3, prereqs: [] },
@@ -45,41 +44,39 @@ const CURRICULUM_DATA = [
         courses: [
           { id: "COE0011", title: "Engineering Data Analysis", units: 3, prereqs: ["COE0007"] },
           { id: "COE0013", title: "Calculus 2", units: 3, prereqs: ["COE0007"] },
-          { id: "COE0015", title: "Physics for Engineers 2", units: 4, prereqs: ["COE0009"] },
-          { id: "GED0025", title: "Ethics", units: 3, prereqs: [] },
-          { id: "GED0029", title: "Art Appreciation", units: 3, prereqs: [] },
-          { id: "GED0031", title: "Readings in Philippine History 2", units: 3, prereqs: [] },
+          { id: "COE0015", title: "Physics for Engineers 2 (LEC)", units: 2, prereqs: ["COE0009", "COE0007"] },
+          { id: "COE0015L", title: "Physics for Engineers 2 (Lab)", units: 1, prereqs: [] },
+          { id: "COE0017", title: "Chemistry for Engineers 2 (LEC)", units: 2, prereqs: ["COE0005"] },
+          { id: "COE0017L", title: "Chemistry for Engineers 2 (Lab)", units: 1, prereqs: [] },
+          { id: "GED0023", title: "Physical Education 3", units: 3, prereqs: ["GED0015"] },
+          { id: "GED0031", title: "Purposive Communication", units: 3, prereqs: ["GED0021"] },
+          { id: "NSTP2", title: "Civic Welfare Training Service 2", units: 0, prereqs: ["NSTP1"] },
         ],
       },
     ],
   },
   {
     year: "Second Year",
-    schoolYear: "2024 - 2025",
     terms: [
       {
         termName: "Term 1",
         courses: [
-          { id: "CE0001", title: "Statics of Rigid Bodies for CE", units: 4, prereqs: ["COE0009"] },
-          { id: "CE0003", title: "Computer Fundamentals for CE (LEC)", units: 2, prereqs: [] },
-          { id: "CE0003L", title: "Computer Fundamentals for CE (Lab)", units: 1, prereqs: [] },
-          { id: "GED0004", title: "Physical Education 1", units: 3, prereqs: [] },
-          { id: "GED0005", title: "National Service Training Program 1", units: 3, prereqs: [] },
+          { id: "CE0001", title: "Statics of Rigid Bodies", units: 3, prereqs: ["COE0009"] },
+          { id: "CE0002L", title: "Computer Fundamentals and Programming", units: 2, prereqs: [] },
+          { id: "CE0003L", title: "Engineering Drawing and Plans", units: 1, prereqs: [] },
+          { id: "CE0005", title: "Introduction to Civil Engineering", units: 2, prereqs: ["GED0006"] },
+          { id: "COE0019", title: "Differential Equations", units: 3, prereqs: ["COE0013"] },
+          { id: "GED0035", title: "The Contemporary World", units: 3, prereqs: [] },
+          { id: "GED0043", title: "Specialized English Program 3", units: 3, prereqs: ["GED0031"] },
+          { id: "GED0045", title: "G.E. Elective – Bioengineering", units: 3, prereqs: [] },
         ],
       },
       {
         termName: "Term 2",
         courses: [
-          { id: "CE0005", title: "Engineering Drawing for CE", units: 2, prereqs: ["CE0003L"] },
-          { id: "CE0007", title: "Mechanics of Fluids for CE", units: 4, prereqs: ["CE0001"] },
-          { id: "CE0009", title: "Fluid Mechanics (LEC)", units: 3, prereqs: ["CE0007"] },
+          { id: "CE0007", title: "Dynamics of Rigid Bodies for CE", units: 2, prereqs: ["CE0001"] },
+          { id: "CE0009", title: "Fluid Mechanics (LEC)", units: 2, prereqs: ["CE0001"] },
           { id: "CE0009L", title: "Fluid Mechanics (Lab)", units: 1, prereqs: [] },
-          { id: "GED0011", title: "Science, Technology and Society", units: 3, prereqs: [] },
-        ],
-      },
-      {
-        termName: "Term 3",
-        courses: [
           { id: "CE0011L", title: "Computer-Aided Drafting for CE", units: 1, prereqs: ["CE0003L"] },
           { id: "CE0013", title: "Mechanics of Deformable Bodies for CE", units: 5, prereqs: ["CE0001"] },
           { id: "CE0015", title: "Fundamentals of Surveying (LEC)", units: 3, prereqs: ["CE0003L"] },
@@ -88,21 +85,39 @@ const CURRICULUM_DATA = [
           { id: "GED0085", title: "Gender and Society", units: 3, prereqs: [] },
         ],
       },
+      {
+        termName: "Term 3",
+        courses: [
+          { id: "CE0017", title: "Building System Design (LEC)", units: 2, prereqs: ["CE0011L"] },
+          { id: "CE0017L", title: "Building System Design (Lab)", units: 1, prereqs: [] },
+          { id: "CE0019", title: "Structural Theory (LEC)", units: 3, prereqs: ["CE0013"] },
+          { id: "CE0019L", title: "Structural Theory (Lab)", units: 1, prereqs: [] },
+          { id: "CE0021", title: "Hydraulics (LEC)", units: 4, prereqs: ["CE0009"] },
+          { id: "CE0021L", title: "Hydraulics (Lab)", units: 1, prereqs: [] },
+          { id: "CE0023", title: "Highway and Railroad Engineering", units: 3, prereqs: ["CE0015"] },
+          { id: "CE0025", title: "CE Correlation Course 1 (LEC)", units: 2, prereqs: ["CE0013"] },
+          { id: "CE0025L", title: "CE Correlation Course 1 (Lab)", units: 1, prereqs: [] },
+          { id: "COE0039", title: "Engineering Economics", units: 3, prereqs: ["COE0011"] },
+        ],
+      },
     ],
   },
   {
     year: "Third Year",
-    schoolYear: "2025 - 2026",
     terms: [
       {
         termName: "Term 1",
         courses: [
           { id: "CE0027", title: "Construction Materials and Testing (LEC)", units: 2, prereqs: ["CE0013"] },
           { id: "CE0027L", title: "Construction Materials and Testing (Lab)", units: 1, prereqs: [] },
-          { id: "CE0029", title: "Hydrology for CE", units: 3, prereqs: ["CE0009"] },
-          { id: "CE0031", title: "CE Statistics", units: 3, prereqs: ["COE0011"] },
-          { id: "CE0033", title: "Geotechnical Engineering 1", units: 3, prereqs: ["CE0013"] },
-          { id: "GED0037", title: "The Life and Works of Rizal", units: 3, prereqs: [] },
+          { id: "CE0029", title: "Geotechnical Engineering 1 (LEC)", units: 3, prereqs: ["CE0013"] },
+          { id: "CE0029L", title: "Geotechnical Engineering 1 (Lab)", units: 1, prereqs: [] },
+          { id: "CE0031", title: "Hydrology", units: 3, prereqs: ["CE0021"] },
+          { id: "CE0033", title: "Quantity Surveying (LEC)", units: 2, prereqs: ["CE0017"] },
+          { id: "CE0033L", title: "Quantity Surveying (Lab)", units: 1, prereqs: [] },
+          { id: "CE0035", title: "Principle of Transportation Engineering", units: 3, prereqs: ["CE0023"] },
+          { id: "COE0049", title: "Engineering Management", units: 2, prereqs: ["COE0039"] },
+          { id: "GED0049", title: "Life and Works of Rizal", units: 3, prereqs: [] },
         ],
       },
       {
@@ -113,14 +128,17 @@ const CURRICULUM_DATA = [
           { id: "CE0039", title: "Principle of Steel Design (LEC)", units: 3, prereqs: ["CE0019"] },
           { id: "CE0039L", title: "Principle of Steel Design (Lab)", units: 1, prereqs: [] },
           { id: "CE0041", title: "Geology for Civil Engineers", units: 2, prereqs: ["CE0033"] },
-          { id: "CE0043", title: "Transportation Engineering 1", units: 3, prereqs: ["CE0015"] },
+          { id: "GED0009", title: "Readings in Philippine History", units: 3, prereqs: [] },
+          { id: "GED0061", title: "Ethics", units: 3, prereqs: [] },
+          { id: "GED0063", title: "Technopreneurship", units: 3, prereqs: ["COE0049", "COE0057"] },
         ],
       },
       {
         termName: "Term 3",
         courses: [
-          { id: "CE0045", title: "Hydraulics for CE", units: 3, prereqs: ["CE0029"] },
-          { id: "CE0047", title: "Numerical Solutions to CE Problems (LEC)", units: 2, prereqs: ["CE0031"] },
+          { id: "CE0043", title: "Professional Course 1 – (Specialized 1) Earthquake Engineering", units: 3, prereqs: ["CE0037", "CE0039"] },
+          { id: "CE0045", title: "Professional Course 2 – (Reinforced Concrete Design)", units: 3, prereqs: ["CE0037", "CE0039"] },
+          { id: "CE0047", title: "Numerical Solutions to CE Problems (LEC)", units: 2, prereqs: ["COE0019"] },
           { id: "CE0047L", title: "Numerical Solutions to CE Problems (Lab)", units: 1, prereqs: [] },
           { id: "CE0049", title: "Methods of Research", units: 3, prereqs: ["COE0049"] },
           { id: "CE0051", title: "CE Correlation Course 2 (LEC)", units: 2, prereqs: ["CE0037", "CE0039", "CE0025"] },
@@ -133,7 +151,6 @@ const CURRICULUM_DATA = [
   },
   {
     year: "Fourth Year",
-    schoolYear: "2026 - 2027",
     terms: [
       {
         termName: "Term 1",
@@ -141,8 +158,8 @@ const CURRICULUM_DATA = [
           { id: "CE0055", title: "CE Laws, Ethics and Contract", units: 3, prereqs: ["CE0031"] },
           { id: "CE0057", title: "CE Project 1 (LEC)", units: 2, prereqs: ["CE0043", "CE0045", "GED0063", "CE0049"] },
           { id: "CE0057L", title: "CE Project 1 (Lab)", units: 1, prereqs: [] },
-          { id: "CE0059", title: "Professional Course 3 – Design of Steel Structures", units: 3, prereqs: ["CE0043", "CE0045"] },
-          { id: "CE0061", title: "Professional Course 4 – Prestressed Concrete Design", units: 3, prereqs: ["CE0043", "CE0045"] },
+          { id: "CE0059", title: "Professional Course 3 – (Specialized 3) Design of Steel Structures", units: 3, prereqs: ["CE0043", "CE0045"] },
+          { id: "CE0061", title: "Professional Course 4 – (Specialized 4) Prestressed Concrete Design", units: 3, prereqs: ["CE0043", "CE0045"] },
           { id: "CE0063", title: "Construction Methods and Project Management", units: 3, prereqs: ["COE0049"] },
           { id: "CE0065", title: "Engineering Utilities 2", units: 3, prereqs: ["CE0053"] },
           { id: "COE0061", title: "Professional Development for Engineers", units: 1, prereqs: ["CE0005"] },
@@ -162,8 +179,8 @@ const CURRICULUM_DATA = [
           { id: "CE0069L", title: "CE Correlation Course 3 (Lab)", units: 1, prereqs: [] },
           { id: "CE0071", title: "CE Project 2 (LEC)", units: 2, prereqs: ["CE0057", "CE0067"] },
           { id: "CE0071L", title: "CE Project 2 (Lab)", units: 1, prereqs: [] },
-          { id: "CE0073", title: "Professional Course 5 – Foundation and Retaining Wall", units: 3, prereqs: ["CE0067"] },
-          { id: "CE0075", title: "Professional Course 6 – Computer Software in Structural Analysis", units: 3, prereqs: ["CE0067"] },
+          { id: "CE0073", title: "Professional Course 5 – (Specialized 5) Foundation and Retaining Wall", units: 3, prereqs: ["CE0067"] },
+          { id: "CE0075", title: "Professional Course 6 – (Specialized 6) Computer Software in Structural Analysis", units: 3, prereqs: ["CE0067"] },
           { id: "CE0077", title: "Technical Elective for CE - COSH", units: 3, prereqs: ["CE0067"] },
         ],
       },
@@ -223,6 +240,30 @@ const App = () => {
     }));
   };
 
+  // Mark all courses in a term as passed (respecting locks)
+  const markTermAsPassed = (term) => {
+    const updates = {};
+
+    term.courses.forEach((course) => {
+      const locked = isLocked(course);
+      // Only mark as passed if not locked
+      if (!locked) {
+        updates[course.id] = "passed";
+      }
+    });
+
+    if (Object.keys(updates).length === 0) {
+      setErrorMsg("No unlocked subjects in this term can be marked as passed yet.");
+      setTimeout(() => setErrorMsg(""), 3000);
+      return;
+    }
+
+    setCourseStatus((prev) => ({
+      ...prev,
+      ...updates,
+    }));
+  };
+
   // Stats
   const totalUnits = CURRICULUM_DATA.reduce(
     (acc, year) =>
@@ -248,7 +289,7 @@ const App = () => {
       );
       return acc + units;
     }
-    return 0 + acc;
+    return acc;
   }, 0);
 
   const percentage =
@@ -267,7 +308,7 @@ const App = () => {
               </h1>
             </div>
             <p className="text-blue-100 opacity-90">
-              Civil Engineering • BSCE Curriculum
+              Civil Engineering • BSCE Curriculum (FEU Institute of Technology)
             </p>
           </div>
 
@@ -332,9 +373,6 @@ const App = () => {
                     <h2 className="font-semibold text-slate-800">
                       {year.year}
                     </h2>
-                    <p className="text-xs text-slate-500">
-                      Academic Year {year.schoolYear}
-                    </p>
                   </div>
                 </div>
                 <ChevronRight
@@ -350,17 +388,28 @@ const App = () => {
                   <div className="grid md:grid-cols-3 gap-4">
                     {year.terms.map((term, tIdx) => (
                       <div key={tIdx} className="flex flex-col">
-                        <div className="mb-3 flex justify-between items-end px-1">
-                          <h3 className="font-semibold text-slate-700 uppercase tracking-wide text-sm">
-                            {term.termName}
-                          </h3>
-                          <span className="text-xs font-mono text-slate-400">
-                            {term.courses.reduce(
-                              (acc, c) => acc + c.units,
-                              0
-                            )}
-                            u
-                          </span>
+                        <div className="mb-3 flex justify-between items-center px-1">
+                          <div>
+                            <h3 className="font-semibold text-slate-700 uppercase tracking-wide text-sm">
+                              {term.termName}
+                            </h3>
+                            <p className="text-[11px] text-slate-400">
+                              {term.courses.reduce(
+                                (acc, c) => acc + c.units,
+                                0
+                              )}
+                              u total
+                            </p>
+                          </div>
+
+                          {/* Term-level "mark all passed" button */}
+                          <button
+                            type="button"
+                            onClick={() => markTermAsPassed(term)}
+                            className="text-[10px] px-2 py-1 rounded-full border border-green-500 text-green-700 bg-green-50 hover:bg-green-100 transition"
+                          >
+                            Mark all subjects this term as passed
+                          </button>
                         </div>
 
                         <div className="space-y-3 flex-grow">
