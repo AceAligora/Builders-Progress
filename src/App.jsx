@@ -7,6 +7,8 @@ import {
   BarChart3,
   ChevronRight,
   GraduationCap,
+  Calculator,
+  LayoutTemplate,
 } from "lucide-react";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/react";
@@ -210,30 +212,30 @@ const isAutoSyncedLabId = (courseId) => {
   return ALL_COURSE_IDS.has(lectureId);
 };
 
-const App = () => {
-  const [courseStatus, setCourseStatus] = useState({});
-  const [errorMsg, setErrorMsg] = useState("");
+const getCoreqLectureId = (courseId) =>
+  courseId.endsWith("L") ? courseId.slice(0, -1) : null;
+
+const isLabCourse = (course) => course.id.endsWith("L");
+
+// --- SHARED GPA HELPERS (used by GPA Calculator page) ---
+const getNumericGpaFromMap = (map, courseId) => {
+  const val = map[courseId];
+  const num = typeof val === "string" ? parseFloat(val) : val;
+  if (Number.isNaN(num)) return null;
+  return num;
+};
+
+// --- CURRICULUM TRACKER PAGE ---
+const CurriculumTrackerPage = ({
+  courseStatus,
+  setCourseStatus,
+  errorMsg,
+  setErrorMsg,
+}) => {
   const [expandedYear, setExpandedYear] = useState("First Year");
-
-  useEffect(() => {
-    const savedData = localStorage.getItem("ce_tracker_data_v2");
-    if (savedData) {
-      setCourseStatus(JSON.parse(savedData));
-    }
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem("ce_tracker_data_v2", JSON.stringify(courseStatus));
-  }, [courseStatus]);
-
-  const getCoreqLectureId = (courseId) =>
-    courseId.endsWith("L") ? courseId.slice(0, -1) : null;
-
-  const isLabCourse = (course) => course.id.endsWith("L");
 
   const isLocked = (course) => {
     if (isAutoSyncedLabId(course.id)) return true; // auto labs are read-only
-
     if (course.prereqs.length === 0) return false;
     const allPrereqsPassed = course.prereqs.every(
       (id) => courseStatus[id] === "passed"
@@ -314,7 +316,6 @@ const App = () => {
     });
   };
 
-  // Reset all courses in a term to inactive
   const resetTerm = (term) => {
     setCourseStatus((prev) => {
       const next = { ...prev };
@@ -328,7 +329,6 @@ const App = () => {
     });
   };
 
-  // Mark all courses in a year as passed (IGNORE prereq locks for this bulk action)
   const markYearAsPassed = (year) => {
     setCourseStatus((prev) => {
       const next = { ...prev };
@@ -336,7 +336,6 @@ const App = () => {
       year.terms.forEach((term) => {
         term.courses.forEach((course) => {
           const autoLab = isAutoSyncedLabId(course.id);
-          // For this bulk action, ignore isLocked/prereqs.
           if (!autoLab) {
             next[course.id] = "passed";
           }
@@ -359,7 +358,6 @@ const App = () => {
     });
   };
 
-  // Reset all courses in a year to inactive
   const resetYear = (year) => {
     setCourseStatus((prev) => {
       const next = { ...prev };
@@ -387,7 +385,6 @@ const App = () => {
     0
   );
 
-  // Units completed = units where status is "passed"
   const completedUnits = Object.keys(courseStatus).reduce((acc, id) => {
     if (courseStatus[id] === "passed") {
       let units = 0;
@@ -403,7 +400,6 @@ const App = () => {
     return acc;
   }, 0);
 
-  // Units active = units where status is "taking"
   const activeUnits = Object.keys(courseStatus).reduce((acc, id) => {
     if (courseStatus[id] === "taking") {
       let units = 0;
@@ -421,8 +417,6 @@ const App = () => {
 
   const remainingUnits = Math.max(totalUnits - completedUnits, 0);
 
-  // --- COURSE COUNTS ---
-  // Count how many courses are passed, taking, inactive/failed
   let passedCourses = 0;
   let activeCourses = 0;
   let inactiveCourses = 0;
@@ -433,7 +427,7 @@ const App = () => {
         const status = courseStatus[course.id] || "inactive";
         if (status === "passed") passedCourses += 1;
         else if (status === "taking") activeCourses += 1;
-        else inactiveCourses += 1; // "inactive" (includes never-taken / failed)
+        else inactiveCourses += 1;
       })
     )
   );
@@ -448,11 +442,7 @@ const App = () => {
   const barWidth = percentage === 0 ? 0 : Math.max(4, percentage);
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-800 flex flex-col">
-      <Analytics />
-      <SpeedInsights />
-
-      {/* --- HERO HEADER --- */}
+    <>
       <div className="bg-blue-900 text-white pb-24 pt-10 px-6 shadow-xl">
         <div className="max-w-6xl mx-auto flex flex-col gap-6 md:flex-row md:justify-between md:items-center">
           <div>
@@ -467,7 +457,6 @@ const App = () => {
             </p>
           </div>
 
-          {/* Summary stats */}
           <div className="grid grid-cols-3 gap-4 bg-gradient-to-r from-blue-800 via-blue-700 to-blue-600 p-4 rounded-xl border border-blue-300/50 backdrop-blur-sm text-center text-xs md:text-sm">
             <div>
               <span className="block text-lg md:text-2xl font-bold">
@@ -506,7 +495,6 @@ const App = () => {
         </div>
       </div>
 
-      {/* MAIN CONTENT */}
       <div className="flex-1 w-full">
         <div className="max-w-6xl mx-auto px-4 -mt-16 pb-12">
           {errorMsg && (
@@ -516,7 +504,7 @@ const App = () => {
             </div>
           )}
 
-          {/* --- PROGRESS BAR --- */}
+          {/* Progress bar */}
           <div className="bg-white rounded-lg p-3 mb-8 shadow-md flex flex-col gap-2">
             <div className="flex justify-between items-center text-xs text-slate-500">
               <span>Overall Progress</span>
@@ -535,7 +523,7 @@ const App = () => {
             </div>
           </div>
 
-          {/* --- CURRICULUM DISPLAY --- */}
+          {/* Curriculum display */}
           <div className="space-y-6">
             {CURRICULUM_DATA.map((year, yIdx) => (
               <div
@@ -566,7 +554,6 @@ const App = () => {
                     />
                   </button>
 
-                  {/* Year-level controls */}
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
@@ -824,7 +811,6 @@ const App = () => {
         {/* PATCH NOTES + FOOTER */}
         <div className="w-full border-t border-slate-200 bg-slate-50/80">
           <div className="max-w-6xl mx-auto px-4 py-6 space-y-4 text-sm text-slate-600">
-            {/* Patch notes */}
             <section>
               <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
                 PATCH NOTES
@@ -864,6 +850,10 @@ const App = () => {
                   percentage and progress bar now reflect completed units only.
                 </li>
                 <li>
+                  <strong>v20:</strong> Introduced separate views for Curriculum
+                  Tracking and GPA Calculation for a cleaner experience.
+                </li>
+                <li>
                   Future versions will focus on UI refinements, export/backup
                   options, and support for curriculum changes or elective
                   tracks.
@@ -871,7 +861,6 @@ const App = () => {
               </ul>
             </section>
 
-            {/* Footer disclaimer */}
             <footer className="pt-2 border-t border-slate-200 text-[11px] text-slate-500">
               <p className="leading-relaxed">
                 This is a personal and on-going project, and it's not affiliated
@@ -882,6 +871,372 @@ const App = () => {
           </div>
         </div>
       </div>
+    </>
+  );
+};
+
+// --- GPA CALCULATOR PAGE ---
+const GpaCalculatorPage = ({ courseGPA, setCourseGPA }) => {
+  const handleGpaChange = (courseId, value) => {
+    if (value === "") {
+      setCourseGPA((prev) => {
+        const next = { ...prev };
+        delete next[courseId];
+        return next;
+      });
+      return;
+    }
+
+    const num = parseFloat(value);
+    if (Number.isNaN(num)) return;
+
+    setCourseGPA((prev) => ({
+      ...prev,
+      [courseId]: value,
+    }));
+  };
+
+  // Global totals
+  let TCU = 0; // total course units
+  let TWQP = 0; // total weighted quality points
+
+  CURRICULUM_DATA.forEach((year) =>
+    year.terms.forEach((term) =>
+      term.courses.forEach((course) => {
+        const gpa = getNumericGpaFromMap(courseGPA, course.id);
+        if (gpa !== null && gpa >= 0) {
+          TCU += course.units;
+          TWQP += course.units * gpa;
+        }
+      })
+    )
+  );
+
+  const TGPA = TCU > 0 ? TWQP / TCU : 0;
+
+  const computeTermGpa = (term) => {
+    let tcu = 0;
+    let twqp = 0;
+    term.courses.forEach((course) => {
+      const gpa = getNumericGpaFromMap(courseGPA, course.id);
+      if (gpa !== null && gpa >= 0) {
+        tcu += course.units;
+        twqp += course.units * gpa;
+      }
+    });
+    return {
+      TCU: tcu,
+      TWQP: twqp,
+      TGPA: tcu > 0 ? twqp / tcu : 0,
+    };
+  };
+
+  return (
+    <>
+      <div className="bg-indigo-900 text-white pb-20 pt-10 px-6 shadow-xl">
+        <div className="max-w-6xl mx-auto flex flex-col gap-6 md:flex-row md:justify-between md:items-center">
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <Calculator className="w-8 h-8 text-indigo-200" />
+              <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
+                GPA Calculator
+              </h1>
+            </div>
+            <p className="text-indigo-100 opacity-90 text-sm md:text-base">
+              Uses the Civil Engineering curriculum data for term and overall TGPA.
+            </p>
+          </div>
+
+          <div className="bg-indigo-800/70 border border-indigo-400/60 rounded-xl px-4 py-3 text-xs md:text-sm max-w-sm">
+            <p className="font-semibold mb-1">Formula Reference</p>
+            <p className="font-mono text-[11px] leading-relaxed">
+              WQP = Course Units × Quality Point (GPA)
+              <br />
+              TCU = Σ Course Units
+              <br />
+              TWQP = Σ WQP
+              <br />
+              TGPA = TWQP / TCU
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-1 w-full">
+        <div className="max-w-6xl mx-auto px-4 -mt-16 pb-12">
+          {/* Overall GPA Summary */}
+          <div className="bg-white rounded-lg p-4 mb-8 shadow-md">
+            <h2 className="text-sm font-semibold text-slate-800 mb-2 flex items-center gap-2">
+              <BarChart3 className="w-4 h-4 text-indigo-600" />
+              Overall GPA Summary
+            </h2>
+
+            <div className="grid grid-cols-3 gap-4 text-xs">
+              <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                <div className="text-slate-500 uppercase tracking-wide text-[10px]">
+                  TCU
+                </div>
+                <div className="text-lg font-semibold text-slate-900">
+                  {TCU.toFixed(2)}
+                </div>
+                <div className="text-[10px] text-slate-400">
+                  Total Course Units (with GPA entered)
+                </div>
+              </div>
+
+              <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                <div className="text-slate-500 uppercase tracking-wide text-[10px]">
+                  TWQP
+                </div>
+                <div className="text-lg font-semibold text-slate-900">
+                  {TWQP.toFixed(3)}
+                </div>
+                <div className="text-[10px] text-slate-400">
+                  Total Weighted Quality Points
+                </div>
+              </div>
+
+              <div className="p-3 rounded-lg bg-indigo-50 border border-indigo-200">
+                <div className="text-indigo-600 uppercase tracking-wide text-[10px]">
+                  TGPA
+                </div>
+                <div className="text-lg font-bold text-indigo-800">
+                  {TGPA.toFixed(3)}
+                </div>
+                <div className="text-[10px] text-indigo-500">
+                  Overall Grade Point Average
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Per-year / per-term GPA inputs */}
+          <div className="space-y-6">
+            {CURRICULUM_DATA.map((year, yIdx) => (
+              <div
+                key={yIdx}
+                className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"
+              >
+                <div className="w-full flex justify-between items-center px-6 py-4 bg-slate-50 border-b border-slate-100">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center">
+                      <GraduationCap className="w-4 h-4 text-indigo-600" />
+                    </div>
+                    <div className="text-left">
+                      <h2 className="font-semibold text-slate-800">
+                        {year.year}
+                      </h2>
+                      <p className="text-[11px] text-slate-500">
+                        Enter your final term GPA for each course.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="px-4 pb-4 pt-3">
+                  <div className="grid md:grid-cols-3 gap-4">
+                    {year.terms.map((term, tIdx) => {
+                      const stats = computeTermGpa(term);
+                      return (
+                        <div key={tIdx} className="flex flex-col">
+                          <div className="mb-3 flex justify-between items-center px-1">
+                            <div>
+                              <h3 className="font-semibold text-slate-700 uppercase tracking-wide text-sm">
+                                {term.termName}
+                              </h3>
+                              <p className="text-[11px] text-slate-400">
+                                {term.courses.reduce(
+                                  (acc, c) => acc + c.units,
+                                  0
+                                )}
+                                u total
+                              </p>
+                              {stats.TCU > 0 && (
+                                <p className="text-[11px] text-slate-500 mt-1">
+                                  <span className="font-semibold">
+                                    TGPA:
+                                  </span>{" "}
+                                  {stats.TGPA.toFixed(3)} ·{" "}
+                                  <span className="font-mono">
+                                    TCU={stats.TCU.toFixed(2)}, TWQP=
+                                    {stats.TWQP.toFixed(3)}
+                                  </span>
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="space-y-3 flex-grow">
+                            {term.courses.map((course) => {
+                              const gpa = getNumericGpaFromMap(
+                                courseGPA,
+                                course.id
+                              );
+                              const wqp =
+                                gpa !== null && gpa >= 0
+                                  ? course.units * gpa
+                                  : null;
+
+                              return (
+                                <div
+                                  key={course.id}
+                                  className="relative p-4 rounded-xl border bg-white border-slate-200 hover:border-indigo-300 hover:shadow-md transition-all duration-200 flex justify-between items-start"
+                                >
+                                  <div className="flex-1 pr-3">
+                                    <div className="flex items-center gap-2 mb-1.5">
+                                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full tracking-wider bg-slate-100 text-slate-600">
+                                        {course.id}
+                                      </span>
+                                      {isLabCourse(course) && (
+                                        <span className="text-[9px] uppercase tracking-wide bg-slate-800 text-slate-50 px-1.5 py-0.5 rounded-full">
+                                          Laboratory
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    <h4 className="text-sm font-semibold leading-snug text-slate-800">
+                                      {course.title}
+                                    </h4>
+
+                                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                                      <span className="text-xs text-slate-500">
+                                        {course.units} Units
+                                      </span>
+
+                                      <div className="flex items-center gap-1 text-[11px] text-slate-500">
+                                        <span>GPA:</span>
+                                        <input
+                                          type="number"
+                                          step="0.01"
+                                          min="0"
+                                          className="w-16 px-1 py-0.5 text-[11px] border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                          value={courseGPA[course.id] ?? ""}
+                                          onChange={(e) =>
+                                            handleGpaChange(
+                                              course.id,
+                                              e.target.value
+                                            )
+                                          }
+                                        />
+                                      </div>
+
+                                      {wqp !== null && (
+                                        <span className="text-[11px] text-indigo-700 font-mono bg-indigo-50 px-1.5 py-0.5 rounded">
+                                          WQP: {wqp.toFixed(3)}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="w-full border-t border-slate-200 bg-slate-50/80">
+          <div className="max-w-6xl mx-auto px-4 py-6 text-[11px] text-slate-500">
+            <p className="leading-relaxed">
+              GPA values are stored locally in your browser (localStorage). Clear your
+              browser storage if you want to reset all GPA inputs.
+            </p>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+};
+
+// --- ROOT APP WITH SIMPLE PAGE SWITCHER ---
+const App = () => {
+  const [courseStatus, setCourseStatus] = useState({});
+  const [courseGPA, setCourseGPA] = useState({});
+  const [errorMsg, setErrorMsg] = useState("");
+  const [activePage, setActivePage] = useState("tracker"); // "tracker" | "gpa"
+
+  useEffect(() => {
+    const savedData = localStorage.getItem("ce_tracker_data_v2");
+    if (savedData) {
+      setCourseStatus(JSON.parse(savedData));
+    }
+
+    const savedGpa = localStorage.getItem("ce_gpa_data_v1");
+    if (savedGpa) {
+      setCourseGPA(JSON.parse(savedGpa));
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("ce_tracker_data_v2", JSON.stringify(courseStatus));
+  }, [courseStatus]);
+
+  useEffect(() => {
+    localStorage.setItem("ce_gpa_data_v1", JSON.stringify(courseGPA));
+  }, [courseGPA]);
+
+  return (
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-800 flex flex-col">
+      <Analytics />
+      <SpeedInsights />
+
+      {/* Top navigation to switch pages */}
+      <header className="w-full bg-white border-b border-slate-200 sticky top-0 z-40">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <GraduationCap className="w-5 h-5 text-blue-700" />
+            <span className="font-semibold text-slate-800 text-sm md:text-base">
+              BSCE Academic Tools
+            </span>
+          </div>
+          <nav className="flex items-center gap-2 text-xs md:text-sm">
+            <button
+              type="button"
+              onClick={() => setActivePage("tracker")}
+              className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full border text-xs md:text-sm transition ${
+                activePage === "tracker"
+                  ? "bg-blue-600 text-white border-blue-600"
+                  : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+              }`}
+            >
+              <LayoutTemplate className="w-4 h-4" />
+              Curriculum Tracker
+            </button>
+            <button
+              type="button"
+              onClick={() => setActivePage("gpa")}
+              className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full border text-xs md:text-sm transition ${
+                activePage === "gpa"
+                  ? "bg-indigo-600 text-white border-indigo-600"
+                  : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+              }`}
+            >
+              <Calculator className="w-4 h-4" />
+              GPA Calculator
+            </button>
+          </nav>
+        </div>
+      </header>
+
+      {activePage === "tracker" ? (
+        <CurriculumTrackerPage
+          courseStatus={courseStatus}
+          setCourseStatus={setCourseStatus}
+          errorMsg={errorMsg}
+          setErrorMsg={setErrorMsg}
+        />
+      ) : (
+        <GpaCalculatorPage
+          courseGPA={courseGPA}
+          setCourseGPA={setCourseGPA}
+        />
+      )}
     </div>
   );
 };
