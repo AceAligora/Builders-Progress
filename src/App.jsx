@@ -12,7 +12,6 @@ import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 
 // --- DATA: Full Civil Engineering Curriculum (FEU Tech BSCE) ---
-// NOTE: "LEC" -> "Lecture", "Lab" -> "Laboratory" in titles
 const CURRICULUM_DATA = [
   {
     year: "First Year",
@@ -80,6 +79,7 @@ const CURRICULUM_DATA = [
           { id: "CE0007", title: "Dynamics of Rigid Bodies for CE", units: 2, prereqs: ["CE0001"] },
           { id: "CE0009", title: "Fluid Mechanics (Lecture)", units: 2, prereqs: ["CE0001"] },
           { id: "CE0009L", title: "Fluid Mechanics (Laboratory)", units: 1, prereqs: [] },
+          // CE0011L is a dedicated lab subject without a paired lecture
           { id: "CE0011L", title: "Computer-Aided Drafting for CE (Laboratory)", units: 1, prereqs: ["CE0003L"] },
           { id: "CE0013", title: "Mechanics of Deformable Bodies for CE", units: 5, prereqs: ["CE0001"] },
           { id: "CE0015", title: "Fundamentals of Surveying (Lecture)", units: 3, prereqs: ["CE0003L"] },
@@ -191,6 +191,11 @@ const CURRICULUM_DATA = [
   },
 ];
 
+// --- Helper: identify lab courses that should be auto-synced with a lecture ---
+// CE0011L is EXCLUDED here because it's an independent lab.
+const isAutoSyncedLabId = (courseId) =>
+  courseId.endsWith("L") && courseId !== "CE0011L";
+
 const App = () => {
   const [courseStatus, setCourseStatus] = useState({});
   const [errorMsg, setErrorMsg] = useState("");
@@ -207,40 +212,44 @@ const App = () => {
     localStorage.setItem("ce_tracker_data_v2", JSON.stringify(courseStatus));
   }, [courseStatus]);
 
-  // Co-requisite: if course id ends with "L", lecture is same id without "L"
-  const getCoreqLectureId = (courseId) => {
-    if (courseId.endsWith("L")) {
-      return courseId.slice(0, -1);
-    }
-    return null;
-  };
+  const getCoreqLectureId = (courseId) =>
+    courseId.endsWith("L") ? courseId.slice(0, -1) : null;
 
-  // Helper: determine if a course is a lab (Laboratory) based on ID
   const isLabCourse = (course) => course.id.endsWith("L");
 
-  // Determine if a course is locked:
-  // - Lecture: locked if prereqs not passed
-  // - Laboratory: locked from manual changes (status controlled by lecture)
   const isLocked = (course) => {
-    if (isLabCourse(course)) return true;
+    // Auto-synced labs are locked (status controlled by lecture)
+    if (isAutoSyncedLabId(course.id)) return true;
+
+    // Independent labs like CE0011L follow normal prereq rules
     if (course.prereqs.length === 0) return false;
+
     const allPrereqsPassed = course.prereqs.every(
       (prereqId) => courseStatus[prereqId] === "passed"
     );
     return !allPrereqsPassed;
   };
 
-  // Sync lab statuses automatically from passed lectures
+  // Sync lab statuses from lectures BOTH ways:
+  // - If lecture is passed -> lab passed
+  // - If lecture is NOT passed -> lab reset to inactive
   const syncLabsWithLectures = (statusMap) => {
     const updated = { ...statusMap };
 
     CURRICULUM_DATA.forEach((year) =>
       year.terms.forEach((term) =>
         term.courses.forEach((course) => {
-          if (isLabCourse(course)) {
+          if (isAutoSyncedLabId(course.id)) {
             const lectureId = getCoreqLectureId(course.id);
-            if (lectureId && updated[lectureId] === "passed") {
+            if (!lectureId) return;
+
+            const lectureStatus = updated[lectureId];
+
+            if (lectureStatus === "passed") {
               updated[course.id] = "passed";
+            } else {
+              // If lecture is not passed, lab should not stay passed/taking
+              updated[course.id] = "inactive";
             }
           }
         })
@@ -250,17 +259,21 @@ const App = () => {
     return updated;
   };
 
-  // Explicit status setter for lectures with prerequisite check
   const setCourseStatusWithValidation = (courseId, targetStatus, locked) => {
     const isLab = courseId.endsWith("L");
-    if (isLab) {
+    const isAutoSyncedLab = isAutoSyncedLabId(courseId);
+
+    // Auto-synced labs cannot be changed manually
+    if (isAutoSyncedLab) {
       setErrorMsg(
-        "Laboratory subjects are automatically updated when their Lecture co-requisite is passed."
+        "This laboratory subject follows the status of its Lecture co-requisite."
       );
       setTimeout(() => setErrorMsg(""), 3000);
       return;
     }
 
+    // Independent labs (like CE0011L) are allowed to be changed manually,
+    // but still respect their own prerequisites through `locked`.
     if (locked && (targetStatus === "taking" || targetStatus === "passed")) {
       const course = CURRICULUM_DATA.flatMap((y) =>
         y.terms.flatMap((t) => t.courses)
@@ -274,19 +287,21 @@ const App = () => {
 
     setCourseStatus((prev) => {
       const next = { ...prev, [courseId]: targetStatus };
+      // Whenever we change a lecture, we resync labs.
       return syncLabsWithLectures(next);
     });
   };
 
-  // Mark all courses in a term as passed (for lectures only; labs sync automatically)
   const markTermAsPassed = (term) => {
     setCourseStatus((prev) => {
       const next = { ...prev };
 
       term.courses.forEach((course) => {
-        const lab = isLabCourse(course);
+        const autoLab = isAutoSyncedLabId(course.id);
         const locked = isLocked(course);
-        if (!lab && !locked) {
+
+        // Don't directly set auto-synced labs; they will follow their lecture.
+        if (!autoLab && !locked) {
           next[course.id] = "passed";
         }
       });
@@ -304,7 +319,6 @@ const App = () => {
     });
   };
 
-  // Stats
   const totalUnits = CURRICULUM_DATA.reduce(
     (acc, year) =>
       acc +
@@ -332,12 +346,17 @@ const App = () => {
     return acc;
   }, 0);
 
-  const percentage =
-    totalUnits === 0 ? 0 : Math.round((passedUnits / totalUnits) * 100);
+  let percentage = 0;
+  if (totalUnits > 0) {
+    percentage = Math.round((passedUnits / totalUnits) * 100);
+    if (Number.isNaN(percentage)) percentage = 0;
+    if (percentage < 0) percentage = 0;
+    if (percentage > 100) percentage = 100;
+  }
+  const barWidth = percentage === 0 ? 0 : Math.max(4, percentage);
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-800">
-      {/* Analytics & Speed Insights */}
       <Analytics />
       <SpeedInsights />
 
@@ -352,7 +371,7 @@ const App = () => {
               </h1>
             </div>
             <p className="text-blue-100 opacity-90 text-sm md:text-base">
-              Civil Engineering • Bachelor of Science in Civil Engineering Curriculum (FEU Institute of Technology)
+              Civil Engineering • BSCE Curriculum (FEU Institute of Technology)
             </p>
           </div>
 
@@ -376,7 +395,6 @@ const App = () => {
 
       {/* MAIN CONTENT */}
       <div className="max-w-6xl mx-auto px-4 -mt-16 pb-20">
-        {/* --- ERROR TOAST --- */}
         {errorMsg && (
           <div className="fixed top-6 left-1/2 transform -translate-x-1/2 bg-white border-l-4 border-red-500 text-slate-700 px-6 py-4 rounded-r shadow-2xl z-50 flex items-center">
             <AlertCircle className="w-5 h-5 mr-3 text-red-500" />
@@ -389,7 +407,7 @@ const App = () => {
           <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden">
             <div
               className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-700 ease-out"
-              style={{ width: `${percentage}%` }}
+              style={{ width: `${barWidth}%`, maxWidth: "100%" }}
             />
           </div>
         </div>
@@ -401,7 +419,6 @@ const App = () => {
               key={yIdx}
               className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"
             >
-              {/* Year Header */}
               <button
                 onClick={() =>
                   setExpandedYear(
@@ -427,7 +444,6 @@ const App = () => {
                 />
               </button>
 
-              {/* Year Content */}
               {expandedYear === year.year && (
                 <div className="px-4 pb-4 pt-3">
                   <div className="grid md:grid-cols-3 gap-4">
@@ -446,8 +462,6 @@ const App = () => {
                               u total
                             </p>
                           </div>
-
-                          {/* Term-level "mark all passed" button */}
                           <button
                             type="button"
                             onClick={() => markTermAsPassed(term)}
@@ -459,12 +473,18 @@ const App = () => {
 
                         <div className="space-y-3 flex-grow">
                           {term.courses.map((course) => {
-                            const status = courseStatus[course.id] || "inactive";
+                            const status =
+                              courseStatus[course.id] || "inactive";
                             const locked = isLocked(course);
-                            const coreqLectureId = getCoreqLectureId(course.id);
+                            const coreqLectureId =
+                              isAutoSyncedLabId(course.id)
+                                ? getCoreqLectureId(course.id)
+                                : null;
                             const lab = isLabCourse(course);
+                            const autoSyncedLab = isAutoSyncedLabId(
+                              course.id
+                            );
 
-                            // --- CARD STYLING LOGIC ---
                             let baseStyle =
                               "relative p-4 rounded-xl border transition-all duration-200 flex justify-between items-start group shadow-sm ";
 
@@ -474,9 +494,12 @@ const App = () => {
                             } else if (status === "taking") {
                               baseStyle +=
                                 "bg-white border-blue-200 hover:shadow-md hover:border-blue-400";
-                            } else if (locked) {
+                            } else if (locked && autoSyncedLab) {
                               baseStyle +=
                                 "bg-slate-100 border-slate-200 opacity-60 grayscale";
+                            } else if (locked) {
+                              baseStyle +=
+                                "bg-slate-100 border-slate-200 opacity-60";
                             } else {
                               baseStyle +=
                                 "bg-white border-slate-200 hover:border-blue-300 hover:shadow-md";
@@ -485,7 +508,6 @@ const App = () => {
                             return (
                               <div key={course.id} className={baseStyle}>
                                 <div className="flex-1 pr-3">
-                                  {/* Header Badge */}
                                   <div className="flex items-center gap-2 mb-1.5">
                                     <span
                                       className={`text-[10px] font-bold px-2 py-0.5 rounded-full tracking-wider
@@ -506,7 +528,6 @@ const App = () => {
                                     )}
                                   </div>
 
-                                  {/* Title */}
                                   <h4
                                     className={`text-sm font-semibold leading-snug 
                                     ${
@@ -518,7 +539,6 @@ const App = () => {
                                     {course.title}
                                   </h4>
 
-                                  {/* Footer: Units & Prereq warning */}
                                   <div className="mt-2 flex items-center gap-2">
                                     <span
                                       className={`text-xs ${
@@ -529,26 +549,28 @@ const App = () => {
                                     >
                                       {course.units} Units
                                     </span>
-                                    {!lab && locked && course.prereqs.length > 0 && (
-                                      <span className="text-[10px] text-red-500 flex items-center bg-red-50 px-1 rounded">
-                                        <Lock className="w-3 h-3 mr-1" />
-                                        Req: {course.prereqs[0]}
-                                      </span>
-                                    )}
+                                    {locked &&
+                                      !autoSyncedLab &&
+                                      course.prereqs.length > 0 && (
+                                        <span className="text-[10px] text-red-500 flex items-center bg-red-50 px-1 rounded">
+                                          <Lock className="w-3 h-3 mr-1" />
+                                          Req: {course.prereqs[0]}
+                                        </span>
+                                      )}
                                   </div>
 
-                                  {/* Co-requisite info for lab courses */}
-                                  {coreqLectureId && (
+                                  {/* Co-requisite info ONLY for auto-synced labs */}
+                                  {autoSyncedLab && coreqLectureId && (
                                     <div className="mt-1 text-[10px] text-blue-600 bg-blue-50 inline-flex items-center px-2 py-0.5 rounded-full">
                                       Co-requisite: {coreqLectureId}
                                     </div>
                                   )}
 
-                                  {/* Status control buttons */}
                                   <div className="mt-3 flex flex-wrap gap-1.5">
-                                    {lab ? (
+                                    {autoSyncedLab ? (
                                       <span className="text-[10px] text-slate-500 italic">
-                                        Laboratory status follows its Lecture co-requisite.
+                                        Laboratory status follows its Lecture
+                                        co-requisite.
                                       </span>
                                     ) : (
                                       <>
@@ -618,7 +640,6 @@ const App = () => {
                                   </div>
                                 </div>
 
-                                {/* Status Icon */}
                                 <div className="mt-1">
                                   {status === "passed" && (
                                     <div className="bg-blue-100 p-1 rounded-full">
@@ -630,12 +651,14 @@ const App = () => {
                                       <BookOpen className="w-4 h-4 text-blue-600" />
                                     </div>
                                   )}
-                                  {(locked || lab) && (
+                                  {(locked || autoSyncedLab) && (
                                     <Lock className="w-4 h-4 text-slate-400" />
                                   )}
-                                  {status === "inactive" && !locked && !lab && (
-                                    <div className="w-6 h-6 rounded-full border-2 border-slate-200 group-hover:border-blue-300"></div>
-                                  )}
+                                  {status === "inactive" &&
+                                    !locked &&
+                                    !autoSyncedLab && (
+                                      <div className="w-6 h-6 rounded-full border-2 border-slate-200 group-hover:border-blue-300"></div>
+                                    )}
                                 </div>
                               </div>
                             );
