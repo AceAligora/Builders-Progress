@@ -827,7 +827,7 @@ const App = () => {
             {/* Patch notes */}
             <section>
               <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
-                Patch Notes (App.jsx v14+)
+                PATCH NOTES
               </h2>
               <ul className="text-xs space-y-1 list-disc pl-4">
                 <li>
