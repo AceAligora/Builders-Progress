@@ -190,22 +190,20 @@ const CURRICULUM_DATA = [
   },
 ];
 
-// --- Helper: which labs are auto-synced to a lecture? ---
-// Rule: lab is auto-synced IF there exists a lecture course with the same code but without trailing "L".
-const buildLectureSet = () => {
+// Build a set of all course IDs to detect lecture counterparts
+const buildCourseIdSet = () => {
   const set = new Set();
   CURRICULUM_DATA.forEach((year) =>
     year.terms.forEach((term) =>
-      term.courses.forEach((course) => {
-        set.add(course.id);
-      })
+      term.courses.forEach((c) => set.add(c.id))
     )
   );
   return set;
 };
 
-const ALL_COURSE_IDS = buildLectureSet();
+const ALL_COURSE_IDS = buildCourseIdSet();
 
+// A lab is auto-synced if its ID ends with "L" and a lecture with same code minus "L" exists.
 const isAutoSyncedLabId = (courseId) => {
   if (!courseId.endsWith("L")) return false;
   const lectureId = courseId.slice(0, -1);
@@ -215,7 +213,7 @@ const isAutoSyncedLabId = (courseId) => {
 const App = () => {
   const [courseStatus, setCourseStatus] = useState({});
   const [errorMsg, setErrorMsg] = useState("");
-  const [expandedYear, setExpandedYear] = useState("First Year"); // Default open
+  const [expandedYear, setExpandedYear] = useState("First Year");
 
   useEffect(() => {
     const savedData = localStorage.getItem("ce_tracker_data_v2");
@@ -234,19 +232,17 @@ const App = () => {
   const isLabCourse = (course) => course.id.endsWith("L");
 
   const isLocked = (course) => {
-    // Auto-synced labs: locked (status controlled by lecture)
-    if (isAutoSyncedLabId(course.id)) return true;
+    if (isAutoSyncedLabId(course.id)) return true; // auto labs are read-only
 
-    // All other subjects (including CE0002L, CE0003L, CE0011L, etc.): normal lock by prereqs
     if (course.prereqs.length === 0) return false;
-
     const allPrereqsPassed = course.prereqs.every(
-      (prereqId) => courseStatus[prereqId] === "passed"
+      (id) => courseStatus[id] === "passed"
     );
     return !allPrereqsPassed;
   };
 
-  // Sync auto-synced lab statuses from lectures both ways
+  // Sync auto labs with their lecture:
+  // - lecture inactive OR taking OR passed -> lab gets the same status
   const syncLabsWithLectures = (statusMap) => {
     const updated = { ...statusMap };
 
@@ -257,13 +253,10 @@ const App = () => {
             const lectureId = getCoreqLectureId(course.id);
             if (!lectureId) return;
 
-            const lectureStatus = updated[lectureId];
+            const lectureStatus = updated[lectureId] || "inactive";
 
-            if (lectureStatus === "passed") {
-              updated[course.id] = "passed";
-            } else {
-              updated[course.id] = "inactive";
-            }
+            // Mirror whatever lecture has (inactive/taking/passed)
+            updated[course.id] = lectureStatus;
           }
         })
       )
@@ -273,9 +266,9 @@ const App = () => {
   };
 
   const setCourseStatusWithValidation = (courseId, targetStatus, locked) => {
-    const autoSyncedLab = isAutoSyncedLabId(courseId);
+    const autoLab = isAutoSyncedLabId(courseId);
 
-    if (autoSyncedLab) {
+    if (autoLab) {
       setErrorMsg(
         "This laboratory subject follows the status of its Lecture co-requisite."
       );
@@ -308,6 +301,7 @@ const App = () => {
         const autoLab = isAutoSyncedLabId(course.id);
         const locked = isLocked(course);
 
+        // Only set things we can change; auto labs will sync afterwards
         if (!autoLab && !locked) {
           next[course.id] = "passed";
         }
@@ -338,13 +332,13 @@ const App = () => {
     0
   );
 
-  const passedUnits = Object.keys(courseStatus).reduce((acc, courseId) => {
-    if (courseStatus[courseId] === "passed") {
+  const passedUnits = Object.keys(courseStatus).reduce((acc, id) => {
+    if (courseStatus[id] === "passed") {
       let units = 0;
       CURRICULUM_DATA.forEach((y) =>
         y.terms.forEach((t) =>
           t.courses.forEach((c) => {
-            if (c.id === courseId) units = c.units;
+            if (c.id === id) units = c.units;
           })
         )
       );
@@ -482,11 +476,11 @@ const App = () => {
                           {term.courses.map((course) => {
                             const status =
                               courseStatus[course.id] || "inactive";
-                            const locked = isLocked(course);
                             const autoSyncedLab = isAutoSyncedLabId(
                               course.id
                             );
                             const lab = isLabCourse(course);
+                            const locked = isLocked(course);
                             const coreqLectureId =
                               autoSyncedLab && getCoreqLectureId(course.id);
 
@@ -500,6 +494,7 @@ const App = () => {
                               baseStyle +=
                                 "bg-white border-blue-200 hover:shadow-md hover:border-blue-400";
                             } else if (locked && autoSyncedLab) {
+                              // Auto lab but inactive -> greyed
                               baseStyle +=
                                 "bg-slate-100 border-slate-200 opacity-60 grayscale";
                             } else if (locked) {
