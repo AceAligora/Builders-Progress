@@ -79,7 +79,6 @@ const CURRICULUM_DATA = [
           { id: "CE0007", title: "Dynamics of Rigid Bodies for CE", units: 2, prereqs: ["CE0001"] },
           { id: "CE0009", title: "Fluid Mechanics (Lecture)", units: 2, prereqs: ["CE0001"] },
           { id: "CE0009L", title: "Fluid Mechanics (Laboratory)", units: 1, prereqs: [] },
-          // CE0011L is a dedicated lab subject without a paired lecture
           { id: "CE0011L", title: "Computer-Aided Drafting for CE (Laboratory)", units: 1, prereqs: ["CE0003L"] },
           { id: "CE0013", title: "Mechanics of Deformable Bodies for CE", units: 5, prereqs: ["CE0001"] },
           { id: "CE0015", title: "Fundamentals of Surveying (Lecture)", units: 3, prereqs: ["CE0003L"] },
@@ -191,10 +190,27 @@ const CURRICULUM_DATA = [
   },
 ];
 
-// --- Helper: identify lab courses that should be auto-synced with a lecture ---
-// CE0011L is EXCLUDED here because it's an independent lab.
-const isAutoSyncedLabId = (courseId) =>
-  courseId.endsWith("L") && courseId !== "CE0011L";
+// --- Helper: which labs are auto-synced to a lecture? ---
+// Rule: lab is auto-synced IF there exists a lecture course with the same code but without trailing "L".
+const buildLectureSet = () => {
+  const set = new Set();
+  CURRICULUM_DATA.forEach((year) =>
+    year.terms.forEach((term) =>
+      term.courses.forEach((course) => {
+        set.add(course.id);
+      })
+    )
+  );
+  return set;
+};
+
+const ALL_COURSE_IDS = buildLectureSet();
+
+const isAutoSyncedLabId = (courseId) => {
+  if (!courseId.endsWith("L")) return false;
+  const lectureId = courseId.slice(0, -1);
+  return ALL_COURSE_IDS.has(lectureId);
+};
 
 const App = () => {
   const [courseStatus, setCourseStatus] = useState({});
@@ -218,10 +234,10 @@ const App = () => {
   const isLabCourse = (course) => course.id.endsWith("L");
 
   const isLocked = (course) => {
-    // Auto-synced labs are locked (status controlled by lecture)
+    // Auto-synced labs: locked (status controlled by lecture)
     if (isAutoSyncedLabId(course.id)) return true;
 
-    // Independent labs like CE0011L follow normal prereq rules
+    // All other subjects (including CE0002L, CE0003L, CE0011L, etc.): normal lock by prereqs
     if (course.prereqs.length === 0) return false;
 
     const allPrereqsPassed = course.prereqs.every(
@@ -230,9 +246,7 @@ const App = () => {
     return !allPrereqsPassed;
   };
 
-  // Sync lab statuses from lectures BOTH ways:
-  // - If lecture is passed -> lab passed
-  // - If lecture is NOT passed -> lab reset to inactive
+  // Sync auto-synced lab statuses from lectures both ways
   const syncLabsWithLectures = (statusMap) => {
     const updated = { ...statusMap };
 
@@ -248,7 +262,6 @@ const App = () => {
             if (lectureStatus === "passed") {
               updated[course.id] = "passed";
             } else {
-              // If lecture is not passed, lab should not stay passed/taking
               updated[course.id] = "inactive";
             }
           }
@@ -260,11 +273,9 @@ const App = () => {
   };
 
   const setCourseStatusWithValidation = (courseId, targetStatus, locked) => {
-    const isLab = courseId.endsWith("L");
-    const isAutoSyncedLab = isAutoSyncedLabId(courseId);
+    const autoSyncedLab = isAutoSyncedLabId(courseId);
 
-    // Auto-synced labs cannot be changed manually
-    if (isAutoSyncedLab) {
+    if (autoSyncedLab) {
       setErrorMsg(
         "This laboratory subject follows the status of its Lecture co-requisite."
       );
@@ -272,8 +283,6 @@ const App = () => {
       return;
     }
 
-    // Independent labs (like CE0011L) are allowed to be changed manually,
-    // but still respect their own prerequisites through `locked`.
     if (locked && (targetStatus === "taking" || targetStatus === "passed")) {
       const course = CURRICULUM_DATA.flatMap((y) =>
         y.terms.flatMap((t) => t.courses)
@@ -287,7 +296,6 @@ const App = () => {
 
     setCourseStatus((prev) => {
       const next = { ...prev, [courseId]: targetStatus };
-      // Whenever we change a lecture, we resync labs.
       return syncLabsWithLectures(next);
     });
   };
@@ -300,7 +308,6 @@ const App = () => {
         const autoLab = isAutoSyncedLabId(course.id);
         const locked = isLocked(course);
 
-        // Don't directly set auto-synced labs; they will follow their lecture.
         if (!autoLab && !locked) {
           next[course.id] = "passed";
         }
@@ -476,14 +483,12 @@ const App = () => {
                             const status =
                               courseStatus[course.id] || "inactive";
                             const locked = isLocked(course);
-                            const coreqLectureId =
-                              isAutoSyncedLabId(course.id)
-                                ? getCoreqLectureId(course.id)
-                                : null;
-                            const lab = isLabCourse(course);
                             const autoSyncedLab = isAutoSyncedLabId(
                               course.id
                             );
+                            const lab = isLabCourse(course);
+                            const coreqLectureId =
+                              autoSyncedLab && getCoreqLectureId(course.id);
 
                             let baseStyle =
                               "relative p-4 rounded-xl border transition-all duration-200 flex justify-between items-start group shadow-sm ";
@@ -559,7 +564,6 @@ const App = () => {
                                       )}
                                   </div>
 
-                                  {/* Co-requisite info ONLY for auto-synced labs */}
                                   {autoSyncedLab && coreqLectureId && (
                                     <div className="mt-1 text-[10px] text-blue-600 bg-blue-50 inline-flex items-center px-2 py-0.5 rounded-full">
                                       Co-requisite: {coreqLectureId}
