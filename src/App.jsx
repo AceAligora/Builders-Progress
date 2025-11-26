@@ -222,9 +222,7 @@ const App = () => {
   // - Lecture: locked if prereqs not passed
   // - Laboratory: locked from manual changes (status controlled by lecture)
   const isLocked = (course) => {
-    // Lock all lab courses for manual status changes
     if (isLabCourse(course)) return true;
-
     if (course.prereqs.length === 0) return false;
     const allPrereqsPassed = course.prereqs.every(
       (prereqId) => courseStatus[prereqId] === "passed"
@@ -242,7 +240,6 @@ const App = () => {
           if (isLabCourse(course)) {
             const lectureId = getCoreqLectureId(course.id);
             if (lectureId && updated[lectureId] === "passed") {
-              // If lecture is passed, lab becomes passed automatically
               updated[course.id] = "passed";
             }
           }
@@ -255,15 +252,15 @@ const App = () => {
 
   // Explicit status setter for lectures with prerequisite check
   const setCourseStatusWithValidation = (courseId, targetStatus, locked) => {
-    // Prevent manual changes on lab courses entirely
     const isLab = courseId.endsWith("L");
     if (isLab) {
-      setErrorMsg("Laboratory subjects are automatically updated when their Lecture co-requisite is passed.");
+      setErrorMsg(
+        "Laboratory subjects are automatically updated when their Lecture co-requisite is passed."
+      );
       setTimeout(() => setErrorMsg(""), 3000);
       return;
     }
 
-    // Only block when trying to move from inactive to active/passed and prereqs are not met
     if (locked && (targetStatus === "taking" || targetStatus === "passed")) {
       const course = CURRICULUM_DATA.flatMap((y) =>
         y.terms.flatMap((t) => t.courses)
@@ -276,11 +273,7 @@ const App = () => {
     }
 
     setCourseStatus((prev) => {
-      const next = {
-        ...prev,
-        [courseId]: targetStatus,
-      };
-      // After updating a lecture, sync lab statuses
+      const next = { ...prev, [courseId]: targetStatus };
       return syncLabsWithLectures(next);
     });
   };
@@ -291,11 +284,9 @@ const App = () => {
       const next = { ...prev };
 
       term.courses.forEach((course) => {
-        const isLab = isLabCourse(course);
+        const lab = isLabCourse(course);
         const locked = isLocked(course);
-
-        // Skip labs (they'll be synced after) and locked lectures
-        if (!isLab && !locked) {
+        if (!lab && !locked) {
           next[course.id] = "passed";
         }
       });
@@ -303,7 +294,9 @@ const App = () => {
       const synced = syncLabsWithLectures(next);
 
       if (Object.keys(synced).length === Object.keys(prev).length) {
-        setErrorMsg("No additional subjects in this term can be marked as passed yet.");
+        setErrorMsg(
+          "No additional subjects in this term can be marked as passed yet."
+        );
         setTimeout(() => setErrorMsg(""), 3000);
       }
 
@@ -349,7 +342,7 @@ const App = () => {
       <SpeedInsights />
 
       {/* --- HERO HEADER --- */}
-      <div className="bg-gradient-to-r from-blue-900 via-blue-700 to-blue-500 text-white pb-24 pt-10 px-6 shadow-xl">
+      <div className="bg-blue-900 text-white pb-24 pt-10 px-6 shadow-xl">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center">
           <div>
             <div className="flex items-center gap-3 mb-2">
@@ -359,11 +352,11 @@ const App = () => {
               </h1>
             </div>
             <p className="text-blue-100 opacity-90 text-sm md:text-base">
-              Civil Engineering • BSCE Curriculum (FEU Institute of Technology)
+              Civil Engineering • Bachelor of Science in Civil Engineering Curriculum (FEU Institute of Technology)
             </p>
           </div>
 
-          <div className="mt-6 md:mt-0 flex gap-8 bg-blue-800/40 p-4 rounded-xl border border-blue-300/40 backdrop-blur-sm">
+          <div className="mt-6 md:mt-0 flex gap-8 bg-gradient-to-r from-blue-800 via-blue-700 to-blue-600 p-4 rounded-xl border border-blue-300/50 backdrop-blur-sm">
             <div className="text-center">
               <span className="block text-3xl font-bold">{passedUnits}</span>
               <span className="text-xs uppercase tracking-wider text-blue-100">
@@ -553,7 +546,6 @@ const App = () => {
 
                                   {/* Status control buttons */}
                                   <div className="mt-3 flex flex-wrap gap-1.5">
-                                    {/* For labs, show read-only status info */}
                                     {lab ? (
                                       <span className="text-[10px] text-slate-500 italic">
                                         Laboratory status follows its Lecture co-requisite.
@@ -590,7 +582,11 @@ const App = () => {
                                             status === "taking"
                                               ? "bg-blue-600 text-white border-blue-600"
                                               : "bg-white text-blue-700 border-blue-300 hover:bg-blue-50"
-                                          } ${locked ? "opacity-60 cursor-not-allowed" : ""}`}
+                                          } ${
+                                            locked
+                                              ? "opacity-60 cursor-not-allowed"
+                                              : ""
+                                          }`}
                                           disabled={locked}
                                         >
                                           Active
@@ -608,7 +604,11 @@ const App = () => {
                                             status === "passed"
                                               ? "bg-green-600 text-white border-green-600"
                                               : "bg-white text-green-700 border-green-300 hover:bg-green-50"
-                                          } ${locked ? "opacity-60 cursor-not-allowed" : ""}`}
+                                          } ${
+                                            locked
+                                              ? "opacity-60 cursor-not-allowed"
+                                              : ""
+                                          }`}
                                           disabled={locked}
                                         >
                                           Passed
@@ -630,10 +630,6 @@ const App = () => {
                                       <BookOpen className="w-4 h-4 text-blue-600" />
                                     </div>
                                   )}
-                                  {/* Lock icon:
-                                      - for lectures: when prereqs not satisfied
-                                      - for labs: always show lock because status is auto-controlled
-                                   */}
                                   {(locked || lab) && (
                                     <Lock className="w-4 h-4 text-slate-400" />
                                   )}
