@@ -9,6 +9,7 @@ import {
   GraduationCap,
   Calculator,
   LayoutTemplate,
+  RotateCcw,
 } from "lucide-react";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/react";
@@ -235,10 +236,7 @@ const isLabCourse = (course) => course.id.endsWith("L");
 const getNumericGpaFromMap = (map, courseId) => {
   const val = map[courseId];
   if (val === undefined || val === "") return null;
-  const num =
-    typeof val === "string"
-      ? parseFloat(val)
-      : val;
+  const num = typeof val === "string" ? parseFloat(val) : val;
   if (Number.isNaN(num)) return null;
   return num;
 };
@@ -603,8 +601,8 @@ const CurriculumTrackerPage = ({
                                 {term.courses.reduce(
                                   (acc, c) => acc + c.units,
                                   0
-                                )}
-                                u total
+                                )}{" "}
+                                Units Total
                               </p>
                             </div>
                             <div className="flex flex-col items-end gap-1">
@@ -873,7 +871,7 @@ const CurriculumTrackerPage = ({
                 <li>
                   <strong>v21:</strong> GPA Calculator now uses dropdowns with
                   fixed increments (0.0–4.0) for easier and more consistent
-                  input.
+                  input, plus reset controls per term and year level.
                 </li>
                 <li>
                   Future versions will focus on UI refinements, export/backup
@@ -916,6 +914,30 @@ const GpaCalculatorPage = ({ courseGPA, setCourseGPA }) => {
       ...prev,
       [courseId]: value,
     }));
+  };
+
+  // Reset GPA for all courses in a given term
+  const resetTermGpa = (term) => {
+    setCourseGPA((prev) => {
+      const next = { ...prev };
+      term.courses.forEach((course) => {
+        delete next[course.id];
+      });
+      return next;
+    });
+  };
+
+  // Reset GPA for all courses in a given year
+  const resetYearGpa = (year) => {
+    setCourseGPA((prev) => {
+      const next = { ...prev };
+      year.terms.forEach((term) =>
+        term.courses.forEach((course) => {
+          delete next[course.id];
+        })
+      );
+      return next;
+    });
   };
 
   // Global totals
@@ -1039,6 +1061,7 @@ const GpaCalculatorPage = ({ courseGPA, setCourseGPA }) => {
                 key={yIdx}
                 className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"
               >
+                {/* Year header + Reset Year GPA */}
                 <div className="w-full flex justify-between items-center px-6 py-4 bg-slate-50 border-b border-slate-100">
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center">
@@ -1053,12 +1076,24 @@ const GpaCalculatorPage = ({ courseGPA, setCourseGPA }) => {
                       </p>
                     </div>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => resetYearGpa(year)}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-slate-300 text-[11px] text-slate-600 bg-white hover:bg-slate-50 transition"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    Reset GPA for this year level
+                  </button>
                 </div>
 
                 <div className="px-4 pb-4 pt-3">
                   <div className="grid md:grid-cols-3 gap-4">
                     {year.terms.map((term, tIdx) => {
                       const stats = computeTermGpa(term);
+                      const totalUnitsTerm = term.courses.reduce(
+                        (acc, c) => acc + c.units,
+                        0
+                      );
                       return (
                         <div key={tIdx} className="flex flex-col">
                           <div className="mb-3 flex justify-between items-center px-1">
@@ -1067,11 +1102,7 @@ const GpaCalculatorPage = ({ courseGPA, setCourseGPA }) => {
                                 {term.termName}
                               </h3>
                               <p className="text-[11px] text-slate-400">
-                                {term.courses.reduce(
-                                  (acc, c) => acc + c.units,
-                                  0
-                                )}
-                                u total
+                                {totalUnitsTerm} Units Total
                               </p>
                               {stats.TCU > 0 && (
                                 <p className="text-[11px] text-slate-500 mt-1">
@@ -1086,6 +1117,15 @@ const GpaCalculatorPage = ({ courseGPA, setCourseGPA }) => {
                                 </p>
                               )}
                             </div>
+                            {/* Reset GPA for this term */}
+                            <button
+                              type="button"
+                              onClick={() => resetTermGpa(term)}
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-full border border-slate-300 text-[10px] text-slate-600 bg-white hover:bg-slate-50 transition"
+                            >
+                              <RotateCcw className="w-3 h-3" />
+                              Reset GPA for this term
+                            </button>
                           </div>
 
                           <div className="space-y-3 flex-grow">
