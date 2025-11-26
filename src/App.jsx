@@ -67,6 +67,7 @@ const CURRICULUM_DATA = [
         termName: "Term 1",
         courses: [
           { id: "CE0001", title: "Statics of Rigid Bodies", units: 3, prereqs: ["COE0009"] },
+          // independent labs (no lecture counterpart)
           { id: "CE0002L", title: "Computer Fundamentals and Programming (Laboratory)", units: 2, prereqs: [] },
           { id: "CE0003L", title: "Engineering Drawing and Plans (Laboratory)", units: 1, prereqs: [] },
           { id: "CE0005", title: "Introduction to Civil Engineering", units: 2, prereqs: ["GED0006"] },
@@ -241,7 +242,7 @@ const getNumericGpaFromMap = (map, courseId) => {
   return num;
 };
 
-// --- CURRICULUM TRACKER PAGE ---
+// --- CURRICULUM TRACKER PAGE (unchanged GPA behavior here) ---
 const CurriculumTrackerPage = ({
   courseStatus,
   setCourseStatus,
@@ -870,8 +871,11 @@ const CurriculumTrackerPage = ({
                 </li>
                 <li>
                   <strong>v21:</strong> GPA Calculator now uses dropdowns with
-                  fixed increments (0.0–4.0) for easier and more consistent
-                  input, plus reset controls per term and year level.
+                  fixed increments (0.0–4.0) and reset controls per term / year.
+                </li>
+                <li>
+                  <strong>v22:</strong> GPA for co-requisite Laboratory courses
+                  is now locked and automatically synced to their Lecture grade.
                 </li>
                 <li>
                   Future versions will focus on UI refinements, export/backup
@@ -897,12 +901,39 @@ const CurriculumTrackerPage = ({
 
 // --- GPA CALCULATOR PAGE ---
 const GpaCalculatorPage = ({ courseGPA, setCourseGPA }) => {
+  // When a lecture GPA changes, sync all auto-synced labs attached to it
+  const syncLabGpasForLecture = (lectureId, nextMap) => {
+    const updated = { ...nextMap };
+
+    CURRICULUM_DATA.forEach((year) =>
+      year.terms.forEach((term) =>
+        term.courses.forEach((course) => {
+          if (isAutoSyncedLabId(course.id)) {
+            const coreqLectureId = getCoreqLectureId(course.id);
+            if (coreqLectureId === lectureId) {
+              updated[course.id] = updated[lectureId] ?? "";
+            }
+          }
+        })
+      )
+    );
+
+    return updated;
+  };
+
   const handleGpaChange = (courseId, value) => {
+    // Labs with co-req lecture are locked: do nothing
+    if (isAutoSyncedLabId(courseId)) {
+      return;
+    }
+
+    // Lecture or independent course
     if (value === "") {
       setCourseGPA((prev) => {
-        const next = { ...prev };
-        delete next[courseId];
-        return next;
+        const base = { ...prev };
+        delete base[courseId];
+        const synced = syncLabGpasForLecture(courseId, base);
+        return synced;
       });
       return;
     }
@@ -910,10 +941,11 @@ const GpaCalculatorPage = ({ courseGPA, setCourseGPA }) => {
     const num = parseFloat(value);
     if (Number.isNaN(num)) return;
 
-    setCourseGPA((prev) => ({
-      ...prev,
-      [courseId]: value,
-    }));
+    setCourseGPA((prev) => {
+      const base = { ...prev, [courseId]: value };
+      const synced = syncLabGpasForLecture(courseId, base);
+      return synced;
+    });
   };
 
   // Reset GPA for all courses in a given term
@@ -947,6 +979,7 @@ const GpaCalculatorPage = ({ courseGPA, setCourseGPA }) => {
   CURRICULUM_DATA.forEach((year) =>
     year.terms.forEach((term) =>
       term.courses.forEach((course) => {
+        // For labs that auto-sync, GPA is read from map via getNumericGpaFromMap
         const gpa = getNumericGpaFromMap(courseGPA, course.id);
         if (gpa !== null && gpa >= 0) {
           TCU += course.units;
@@ -1072,7 +1105,9 @@ const GpaCalculatorPage = ({ courseGPA, setCourseGPA }) => {
                         {year.year}
                       </h2>
                       <p className="text-[11px] text-slate-500">
-                        Select your final term GPA for each course.
+                        Select your final term GPA for each course. Laboratory
+                        courses with a Lecture co-requisite will use the same
+                        GPA as their Lecture.
                       </p>
                     </div>
                   </div>
@@ -1139,6 +1174,15 @@ const GpaCalculatorPage = ({ courseGPA, setCourseGPA }) => {
                                   ? course.units * gpa
                                   : null;
 
+                              const isAutoLab = isAutoSyncedLabId(course.id);
+                              const lectureId = isAutoLab
+                                ? getCoreqLectureId(course.id)
+                                : null;
+                              const lectureGpaValue =
+                                lectureId && courseGPA[lectureId] !== undefined
+                                  ? courseGPA[lectureId]
+                                  : "";
+
                               return (
                                 <div
                                   key={course.id}
@@ -1165,25 +1209,52 @@ const GpaCalculatorPage = ({ courseGPA, setCourseGPA }) => {
                                         {course.units} Units
                                       </span>
 
-                                      {/* GPA dropdown */}
+                                      {/* GPA dropdown or locked display */}
                                       <div className="flex items-center gap-1 text-[11px] text-slate-500">
                                         <span>GPA:</span>
-                                        <select
-                                          className="w-20 px-1 py-0.5 text-[11px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                                          value={courseGPA[course.id] ?? ""}
-                                          onChange={(e) =>
-                                            handleGpaChange(
-                                              course.id,
-                                              e.target.value
-                                            )
-                                          }
-                                        >
-                                          {GPA_OPTIONS.map((opt) => (
-                                            <option key={opt} value={opt}>
-                                              {opt === "" ? "-" : opt}
-                                            </option>
-                                          ))}
-                                        </select>
+                                        {isAutoLab && lectureId ? (
+                                          <>
+                                            <select
+                                              className="w-20 px-1 py-0.5 text-[11px] border border-slate-300 rounded bg-slate-100 text-slate-500 cursor-not-allowed"
+                                              value={lectureGpaValue}
+                                              disabled
+                                            >
+                                              <option value="">
+                                                -
+                                              </option>
+                                              {GPA_OPTIONS.filter(
+                                                (o) => o !== ""
+                                              ).map((opt) => (
+                                                <option
+                                                  key={opt}
+                                                  value={opt}
+                                                >
+                                                  {opt}
+                                                </option>
+                                              ))}
+                                            </select>
+                                            <span className="text-[10px] text-slate-400">
+                                              (Same as {lectureId})
+                                            </span>
+                                          </>
+                                        ) : (
+                                          <select
+                                            className="w-20 px-1 py-0.5 text-[11px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                            value={courseGPA[course.id] ?? ""}
+                                            onChange={(e) =>
+                                              handleGpaChange(
+                                                course.id,
+                                                e.target.value
+                                              )
+                                            }
+                                          >
+                                            {GPA_OPTIONS.map((opt) => (
+                                              <option key={opt} value={opt}>
+                                                {opt === "" ? "-" : opt}
+                                              </option>
+                                            ))}
+                                          </select>
+                                        )}
                                       </div>
 
                                       {wqp !== null && (
