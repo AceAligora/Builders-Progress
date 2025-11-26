@@ -328,7 +328,7 @@ const App = () => {
     });
   };
 
-  // NEW: Mark all courses in a year as passed
+  // Mark all courses in a year as passed (IGNORE prereq locks for this bulk action)
   const markYearAsPassed = (year) => {
     setCourseStatus((prev) => {
       const next = { ...prev };
@@ -336,8 +336,8 @@ const App = () => {
       year.terms.forEach((term) => {
         term.courses.forEach((course) => {
           const autoLab = isAutoSyncedLabId(course.id);
-          const locked = isLocked(course);
-          if (!autoLab && !locked) {
+          // For this bulk action, ignore isLocked/prereqs.
+          if (!autoLab) {
             next[course.id] = "passed";
           }
         });
@@ -345,9 +345,13 @@ const App = () => {
 
       const synced = syncLabsWithLectures(next);
 
-      if (Object.keys(synced).length === Object.keys(prev).length) {
+      // Optional: message if nothing actually changed
+      const changed = Object.keys(synced).some(
+        (key) => synced[key] !== prev[key]
+      );
+      if (!changed) {
         setErrorMsg(
-          "No additional subjects in this year can be marked as passed yet."
+          "All subjects in this year are already marked as passed."
         );
         setTimeout(() => setErrorMsg(""), 3000);
       }
@@ -356,7 +360,7 @@ const App = () => {
     });
   };
 
-  // NEW: Reset all courses in a year to inactive
+  // Reset all courses in a year to inactive
   const resetYear = (year) => {
     setCourseStatus((prev) => {
       const next = { ...prev };
@@ -506,7 +510,7 @@ const App = () => {
                     />
                   </button>
 
-                  {/* NEW: Year-level controls */}
+                  {/* Year-level controls */}
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
