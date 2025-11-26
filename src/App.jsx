@@ -314,6 +314,20 @@ const App = () => {
     });
   };
 
+  // Reset all courses in a term to inactive
+  const resetTerm = (term) => {
+    setCourseStatus((prev) => {
+      const next = { ...prev };
+
+      term.courses.forEach((course) => {
+        next[course.id] = "inactive";
+      });
+
+      const synced = syncLabsWithLectures(next);
+      return synced;
+    });
+  };
+
   const totalUnits = CURRICULUM_DATA.reduce(
     (acc, year) =>
       acc +
@@ -398,14 +412,13 @@ const App = () => {
             </div>
           )}
 
-          {/* --- PROGRESS BAR (wrapped in flex to avoid layout issues) --- */}
+          {/* --- PROGRESS BAR --- */}
           <div className="bg-white rounded-lg p-3 mb-8 shadow-md flex flex-col gap-2">
             <div className="flex justify-between items-center text-xs text-slate-500">
               <span>Overall Progress</span>
               <span>{percentage}%</span>
             </div>
             <div className="relative h-3 w-full bg-slate-100 rounded-full overflow-hidden">
-              {/* Fallback inner track so something is always visible */}
               <div className="absolute inset-0 bg-slate-100" />
               <div
                 className="relative h-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-700 ease-out"
@@ -468,13 +481,22 @@ const App = () => {
                                 u total
                               </p>
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => markTermAsPassed(term)}
-                              className="text-[10px] px-2 py-1 rounded-full border border-green-500 text-green-700 bg-green-50 hover:bg-green-100 transition"
-                            >
-                              Mark all subjects this term as passed
-                            </button>
+                            <div className="flex flex-col items-end gap-1">
+                              <button
+                                type="button"
+                                onClick={() => markTermAsPassed(term)}
+                                className="text-[10px] px-2 py-1 rounded-full border border-green-500 text-green-700 bg-green-50 hover:bg-green-100 transition"
+                              >
+                                Mark all courses this term as passed
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => resetTerm(term)}
+                                className="text-[10px] px-2 py-1 rounded-full border border-slate-300 text-slate-600 bg-white hover:bg-slate-50 transition"
+                              >
+                                Reset this term
+                              </button>
+                            </div>
                           </div>
 
                           <div className="space-y-3 flex-grow">
@@ -683,29 +705,41 @@ const App = () => {
             {/* Patch notes */}
             <section>
               <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
-                Patch Notes
+                Patch Notes (App.jsx v14+)
               </h2>
               <ul className="text-xs space-y-1 list-disc pl-4">
                 <li>
-                  Added dedicated status buttons (Inactive / Failed, Active,
-                  Passed) for each subject.
+                  <strong>v14:</strong> Introduced dedicated status buttons
+                  (Inactive / Failed, Active, Passed) for each course instead
+                  of click-cycling; added co-requisite display linking
+                  Laboratory subjects to their Lecture counterparts.
                 </li>
                 <li>
-                  Laboratory subjects with a matching Lecture now automatically
-                  mirror the Lecture status (Inactive, Active, Passed).
+                  <strong>v15:</strong> Implemented automatic synchronization
+                  for true co-requisite laboratory courses: their status now
+                  mirrors the status of their Lecture (Inactive, Active,
+                  Passed).
                 </li>
                 <li>
-                  Independent laboratory subjects (e.g., CE0002L, CE0003L,
-                  CE0011L) can now be managed separately with their own status
-                  buttons.
+                  <strong>v16:</strong> Marked independent labs (e.g., CE0002L,
+                  CE0003L, CE0011L) as fully controllable with their own
+                  buttons, while keeping Lecture–Lab auto-sync only when a
+                  matching Lecture course actually exists.
                 </li>
                 <li>
-                  Improved progress bar reliability and visibility for overall
-                  curriculum completion.
+                  <strong>v17:</strong> Added Vercel Web Analytics and Speed
+                  Insights integration, improved the header styling, and made
+                  the overall progress bar more reliable and visible.
                 </li>
                 <li>
-                  Added Vercel Analytics and Speed Insights integration for
-                  performance and usage tracking.
+                  <strong>v18:</strong> Added term-level controls: “Mark all
+                  courses this term as passed” and “Reset this term”, with
+                  automatic updates to dependent laboratory courses.
+                </li>
+                <li>
+                  Future versions will focus on UI refinements, export/backup
+                  options, and support for curriculum changes or elective
+                  tracks.
                 </li>
               </ul>
             </section>
