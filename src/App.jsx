@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Check,
   Lock,
@@ -7,6 +7,13 @@ import {
   BarChart3,
   ChevronRight,
   GraduationCap,
+  Download,
+  Upload,
+  Copy,
+  X,
+  Calculator,
+  LayoutTemplate,
+  RotateCcw,
 } from "lucide-react";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/react";
@@ -190,6 +197,20 @@ const CURRICULUM_DATA = [
   },
 ];
 
+// GPA dropdown options
+const GPA_OPTIONS = [
+  "",
+  "0.0",
+  "0.5",
+  "1.0",
+  "1.5",
+  "2.0",
+  "2.5",
+  "3.0",
+  "3.5",
+  "4.0",
+];
+
 // Build a set of all course IDs to detect lecture counterparts
 const buildCourseIdSet = () => {
   const set = new Set();
@@ -210,26 +231,36 @@ const isAutoSyncedLabId = (courseId) => {
   return ALL_COURSE_IDS.has(lectureId);
 };
 
-const App = () => {
-  const [courseStatus, setCourseStatus] = useState({});
-  const [errorMsg, setErrorMsg] = useState("");
+const getCoreqLectureId = (courseId) =>
+  courseId.endsWith("L") ? courseId.slice(0, -1) : null;
+
+const isLabCourse = (course) => course.id.endsWith("L");
+
+// GPA helpers
+const getNumericGpaFromMap = (map, courseId) => {
+  const val = map[courseId];
+  if (val === undefined || val === "") return null;
+  const num = typeof val === "string" ? parseFloat(val) : val;
+  if (Number.isNaN(num)) return null;
+  return num;
+};
+
+// ---------------- CURRICULUM TRACKER PAGE ----------------
+const CurriculumTrackerPage = ({
+  courseStatus,
+  setCourseStatus,
+  errorMsg,
+  setErrorMsg,
+  successMsg,
+  setSuccessMsg,
+}) => {
   const [expandedYear, setExpandedYear] = useState("First Year");
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importText, setImportText] = useState("");
+  const fileInputRef = useRef(null);
 
-  useEffect(() => {
-    const savedData = localStorage.getItem("ce_tracker_data_v2");
-    if (savedData) {
-      setCourseStatus(JSON.parse(savedData));
-    }
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem("ce_tracker_data_v2", JSON.stringify(courseStatus));
-  }, [courseStatus]);
-
-  const getCoreqLectureId = (courseId) =>
-    courseId.endsWith("L") ? courseId.slice(0, -1) : null;
-
-  const isLabCourse = (course) => course.id.endsWith("L");
+  const getCoreqLectureIdLocal = getCoreqLectureId;
+  const isLabCourseLocal = isLabCourse;
 
   const isLocked = (course) => {
     if (isAutoSyncedLabId(course.id)) return true; // auto labs are read-only
@@ -249,7 +280,7 @@ const App = () => {
       year.terms.forEach((term) =>
         term.courses.forEach((course) => {
           if (isAutoSyncedLabId(course.id)) {
-            const lectureId = getCoreqLectureId(course.id);
+            const lectureId = getCoreqLectureIdLocal(course.id);
             if (!lectureId) return;
             const lectureStatus = updated[lectureId] || "inactive";
             updated[course.id] = lectureStatus;
@@ -336,7 +367,6 @@ const App = () => {
       year.terms.forEach((term) => {
         term.courses.forEach((course) => {
           const autoLab = isAutoSyncedLabId(course.id);
-          // For this bulk action, ignore isLocked/prereqs.
           if (!autoLab) {
             next[course.id] = "passed";
           }
@@ -375,6 +405,86 @@ const App = () => {
     });
   };
 
+  // --- DATA MANAGEMENT (tracker) ---
+
+  const exportToClipboard = async () => {
+    try {
+      const data = localStorage.getItem("ce_tracker_data_v2") || "{}";
+      await navigator.clipboard.writeText(data);
+      setSuccessMsg("Tracker data copied to clipboard!");
+      setTimeout(() => setSuccessMsg(""), 4000);
+    } catch (err) {
+      console.error("Clipboard export failed:", err);
+      setErrorMsg("Failed to copy to clipboard. Please try the download option.");
+      setTimeout(() => setErrorMsg(""), 3000);
+    }
+  };
+
+  const exportToFile = () => {
+    const data = localStorage.getItem("ce_tracker_data_v2") || "{}";
+    const blob = new Blob([data], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const dateStr = new Date().toISOString().split("T")[0];
+    a.download = `builders-progress-tracker-backup-${dateStr}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setSuccessMsg("Tracker data exported successfully!");
+    setTimeout(() => setSuccessMsg(""), 3000);
+  };
+
+  const importFromText = () => {
+    try {
+      const parsed = JSON.parse(importText.trim());
+      if (typeof parsed !== "object" || parsed === null) {
+        throw new Error("Invalid format");
+      }
+      const synced = syncLabsWithLectures(parsed);
+      setCourseStatus(synced);
+      setShowImportModal(false);
+      setImportText("");
+      setSuccessMsg("Tracker data imported successfully!");
+      setTimeout(() => setSuccessMsg(""), 3000);
+    } catch (err) {
+      console.error("Import from text failed:", err);
+      setErrorMsg("Invalid data format. Please paste valid JSON data.");
+      setTimeout(() => setErrorMsg(""), 3000);
+    }
+  };
+
+  const handleFileUpload = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result;
+        const parsed = JSON.parse(content);
+        if (typeof parsed !== "object" || parsed === null) {
+          throw new Error("Invalid format");
+        }
+        const synced = syncLabsWithLectures(parsed);
+        setCourseStatus(synced);
+        setShowImportModal(false);
+        setImportText("");
+        setSuccessMsg("Tracker data imported successfully from file!");
+        setTimeout(() => setSuccessMsg(""), 3000);
+      } catch (err) {
+        console.error("Import from file failed:", err);
+        setErrorMsg("Invalid file format. Please select a valid backup file.");
+        setTimeout(() => setErrorMsg(""), 3000);
+      }
+    };
+    reader.readAsText(file);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
   const totalUnits = CURRICULUM_DATA.reduce(
     (acc, year) =>
       acc +
@@ -387,7 +497,6 @@ const App = () => {
     0
   );
 
-  // Units completed = units where status is "passed"
   const completedUnits = Object.keys(courseStatus).reduce((acc, id) => {
     if (courseStatus[id] === "passed") {
       let units = 0;
@@ -403,7 +512,6 @@ const App = () => {
     return acc;
   }, 0);
 
-  // Units active = units where status is "taking"
   const activeUnits = Object.keys(courseStatus).reduce((acc, id) => {
     if (courseStatus[id] === "taking") {
       let units = 0;
@@ -421,8 +529,6 @@ const App = () => {
 
   const remainingUnits = Math.max(totalUnits - completedUnits, 0);
 
-  // --- COURSE COUNTS ---
-  // Count how many courses are passed, taking, inactive/failed
   let passedCourses = 0;
   let activeCourses = 0;
   let inactiveCourses = 0;
@@ -433,7 +539,7 @@ const App = () => {
         const status = courseStatus[course.id] || "inactive";
         if (status === "passed") passedCourses += 1;
         else if (status === "taking") activeCourses += 1;
-        else inactiveCourses += 1; // "inactive" (includes never-taken / failed)
+        else inactiveCourses += 1;
       })
     )
   );
@@ -448,11 +554,8 @@ const App = () => {
   const barWidth = percentage === 0 ? 0 : Math.max(4, percentage);
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-800 flex flex-col">
-      <Analytics />
-      <SpeedInsights />
-
-      {/* --- HERO HEADER --- */}
+    <>
+      {/* HERO HEADER */}
       <div className="bg-blue-900 text-white pb-24 pt-10 px-6 shadow-xl">
         <div className="max-w-6xl mx-auto flex flex-col gap-6 md:flex-row md:justify-between md:items-center">
           <div>
@@ -516,7 +619,71 @@ const App = () => {
             </div>
           )}
 
-          {/* --- PROGRESS BAR --- */}
+          {successMsg && (
+            <div className="fixed top-6 left-1/2 transform -translate-x-1/2 bg-white border-l-4 border-green-500 text-slate-700 px-6 py-4 rounded-r shadow-2xl z-50 flex items-center">
+              <Check className="w-5 h-5 mr-3 text-green-500" />
+              <span className="font-medium">{successMsg}</span>
+            </div>
+          )}
+
+          {/* Import Modal */}
+          {showImportModal && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-semibold text-slate-800">Import Data</h3>
+                  <button
+                    onClick={() => {
+                      setShowImportModal(false);
+                      setImportText("");
+                    }}
+                    className="text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <p className="text-sm text-slate-600 mb-4">
+                  Paste your exported data below, or upload a backup file to restore your progress.
+                </p>
+
+                <textarea
+                  value={importText}
+                  onChange={(e) => setImportText(e.target.value)}
+                  placeholder='Paste your JSON data here (e.g., {"COE0001":"passed",...})'
+                  className="w-full h-32 p-3 border border-slate-300 rounded-lg text-sm font-mono resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+
+                <div className="flex gap-2 mt-4">
+                  <button
+                    onClick={importFromText}
+                    disabled={!importText.trim()}
+                    className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg text-sm font-medium hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Import from Text
+                  </button>
+                  <label className="flex-1">
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      accept=".json"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                    />
+                    <span className="block w-full text-center bg-slate-100 text-slate-700 py-2 px-4 rounded-lg text-sm font-medium hover:bg-slate-200 transition cursor-pointer">
+                      Upload File
+                    </span>
+                  </label>
+                </div>
+
+                <p className="text-xs text-slate-400 mt-4 text-center">
+                  This will replace your current progress data.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* PROGRESS BAR */}
           <div className="bg-white rounded-lg p-3 mb-8 shadow-md flex flex-col gap-2">
             <div className="flex justify-between items-center text-xs text-slate-500">
               <span>Overall Progress</span>
@@ -535,7 +702,7 @@ const App = () => {
             </div>
           </div>
 
-          {/* --- CURRICULUM DISPLAY --- */}
+          {/* CURRICULUM DISPLAY */}
           <div className="space-y-6">
             {CURRICULUM_DATA.map((year, yIdx) => (
               <div
@@ -599,8 +766,8 @@ const App = () => {
                                 {term.courses.reduce(
                                   (acc, c) => acc + c.units,
                                   0
-                                )}
-                                u total
+                                )}{" "}
+                                Units Total
                               </p>
                             </div>
                             <div className="flex flex-col items-end gap-1">
@@ -628,10 +795,11 @@ const App = () => {
                               const autoSyncedLab = isAutoSyncedLabId(
                                 course.id
                               );
-                              const lab = isLabCourse(course);
+                              const lab = isLabCourseLocal(course);
                               const locked = isLocked(course);
                               const coreqLectureId =
-                                autoSyncedLab && getCoreqLectureId(course.id);
+                                autoSyncedLab &&
+                                getCoreqLectureIdLocal(course.id);
 
                               let baseStyle =
                                 "relative p-4 rounded-xl border transition-all duration-200 flex justify-between items-start group shadow-sm ";
@@ -821,9 +989,42 @@ const App = () => {
           </div>
         </div>
 
-        {/* PATCH NOTES + FOOTER */}
+        {/* DATA MANAGEMENT + FOOTER */}
         <div className="w-full border-t border-slate-200 bg-slate-50/80">
           <div className="max-w-6xl mx-auto px-4 py-6 space-y-4 text-sm text-slate-600">
+            {/* Data Management Section */}
+            <section>
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
+                DATA MANAGEMENT (Tracker)
+              </h2>
+              <p className="text-xs text-slate-500 mb-3">
+                Transfer your tracker progress between the main site and preview site, or create a backup of your data.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={exportToClipboard}
+                  className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-400 transition"
+                >
+                  <Copy className="w-4 h-4" />
+                  Copy Tracker Data
+                </button>
+                <button
+                  onClick={exportToFile}
+                  className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-400 transition"
+                >
+                  <Download className="w-4 h-4" />
+                  Download Tracker Backup
+                </button>
+                <button
+                  onClick={() => setShowImportModal(true)}
+                  className="inline-flex items-center gap-2 px-3 py-2 bg-blue-600 border border-blue-600 rounded-lg text-xs font-medium text-white hover:bg-blue-700 transition"
+                >
+                  <Upload className="w-4 h-4" />
+                  Import Tracker Data
+                </button>
+              </div>
+            </section>
+
             {/* Patch notes */}
             <section>
               <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
@@ -864,9 +1065,14 @@ const App = () => {
                   percentage and progress bar now reflect completed units only.
                 </li>
                 <li>
-                  Future versions will focus on UI refinements, export/backup
-                  options, and support for curriculum changes or elective
-                  tracks.
+                  <strong>v20:</strong> Added data import/export functionality to 
+                  transfer progress between the main site and preview site, or 
+                  create backups of your data.
+                </li>
+                <li>
+                  <strong>v21+ (preview):</strong> Added separate Curriculum Tracker and GPA
+                  Calculator views with lecture–lab GPA auto-sync and GPA data
+                  management.
                 </li>
               </ul>
             </section>
@@ -882,6 +1088,656 @@ const App = () => {
           </div>
         </div>
       </div>
+    </>
+  );
+};
+
+// ---------------- GPA CALCULATOR PAGE ----------------
+const GpaCalculatorPage = ({ courseGPA, setCourseGPA, errorMsg, setErrorMsg, successMsg, setSuccessMsg }) => {
+  const [showGpaImportModal, setShowGpaImportModal] = useState(false);
+  const [gpaImportText, setGpaImportText] = useState("");
+  const gpaFileInputRef = useRef(null);
+
+  // Sync lab GPAs when lecture GPA changes
+  const syncLabGpasForLecture = (lectureId, nextMap) => {
+    const updated = { ...nextMap };
+
+    CURRICULUM_DATA.forEach((year) =>
+      year.terms.forEach((term) =>
+        term.courses.forEach((course) => {
+          if (isAutoSyncedLabId(course.id)) {
+            const coreqLectureId = getCoreqLectureId(course.id);
+            if (coreqLectureId === lectureId) {
+              updated[course.id] = updated[lectureId] ?? "";
+            }
+          }
+        })
+      )
+    );
+
+    return updated;
+  };
+
+  const handleGpaChange = (courseId, value) => {
+    // Co-requisite labs are locked; they always mirror lecture GPA
+    if (isAutoSyncedLabId(courseId)) {
+      return;
+    }
+
+    if (value === "") {
+      setCourseGPA((prev) => {
+        const base = { ...prev };
+        delete base[courseId];
+        return syncLabGpasForLecture(courseId, base);
+      });
+      return;
+    }
+
+    const num = parseFloat(value);
+    if (Number.isNaN(num)) return;
+
+    setCourseGPA((prev) => {
+      const base = { ...prev, [courseId]: value };
+      return syncLabGpasForLecture(courseId, base);
+    });
+  };
+
+  const resetTermGpa = (term) => {
+    setCourseGPA((prev) => {
+      const next = { ...prev };
+      term.courses.forEach((course) => {
+        delete next[course.id];
+      });
+      return next;
+    });
+  };
+
+  const resetYearGpa = (year) => {
+    setCourseGPA((prev) => {
+      const next = { ...prev };
+      year.terms.forEach((term) =>
+        term.courses.forEach((course) => {
+          delete next[course.id];
+        })
+      );
+      return next;
+    });
+  };
+
+  // --- DATA MANAGEMENT (GPA) ---
+
+  const exportGpaToClipboard = async () => {
+    try {
+      const data = localStorage.getItem("ce_gpa_data_v1") || "{}";
+      await navigator.clipboard.writeText(data);
+      setSuccessMsg("GPA data copied to clipboard!");
+      setTimeout(() => setSuccessMsg(""), 4000);
+    } catch (err) {
+      console.error("GPA clipboard export failed:", err);
+      setErrorMsg("Failed to copy GPA data. Please try the download option.");
+      setTimeout(() => setErrorMsg(""), 3000);
+    }
+  };
+
+  const exportGpaToFile = () => {
+    const data = localStorage.getItem("ce_gpa_data_v1") || "{}";
+    const blob = new Blob([data], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const dateStr = new Date().toISOString().split("T")[0];
+    a.download = `builders-progress-gpa-backup-${dateStr}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setSuccessMsg("GPA data exported successfully!");
+    setTimeout(() => setSuccessMsg(""), 3000);
+  };
+
+  const importGpaFromText = () => {
+    try {
+      const parsed = JSON.parse(gpaImportText.trim());
+      if (typeof parsed !== "object" || parsed === null) {
+        throw new Error("Invalid format");
+      }
+      setCourseGPA(parsed);
+      setShowGpaImportModal(false);
+      setGpaImportText("");
+      setSuccessMsg("GPA data imported successfully!");
+      setTimeout(() => setSuccessMsg(""), 3000);
+    } catch (err) {
+      console.error("GPA import from text failed:", err);
+      setErrorMsg("Invalid GPA data format. Please paste valid JSON data.");
+      setTimeout(() => setErrorMsg(""), 3000);
+    }
+  };
+
+  const handleGpaFileUpload = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result;
+        const parsed = JSON.parse(content);
+        if (typeof parsed !== "object" || parsed === null) {
+          throw new Error("Invalid format");
+        }
+        setCourseGPA(parsed);
+        setShowGpaImportModal(false);
+        setGpaImportText("");
+        setSuccessMsg("GPA data imported successfully from file!");
+        setTimeout(() => setSuccessMsg(""), 3000);
+      } catch (err) {
+        console.error("GPA import from file failed:", err);
+        setErrorMsg("Invalid GPA backup file. Please select a valid file.");
+        setTimeout(() => setErrorMsg(""), 3000);
+      }
+    };
+    reader.readAsText(file);
+    if (gpaFileInputRef.current) {
+      gpaFileInputRef.current.value = "";
+    }
+  };
+
+  // Global totals
+  let TCU = 0;
+  let TWQP = 0;
+
+  CURRICULUM_DATA.forEach((year) =>
+    year.terms.forEach((term) =>
+      term.courses.forEach((course) => {
+        const gpa = getNumericGpaFromMap(courseGPA, course.id);
+        if (gpa !== null && gpa >= 0) {
+          TCU += course.units;
+          TWQP += course.units * gpa;
+        }
+      })
+    )
+  );
+
+  const TGPA = TCU > 0 ? TWQP / TCU : 0;
+
+  const computeTermGpa = (term) => {
+    let tcu = 0;
+    let twqp = 0;
+    term.courses.forEach((course) => {
+      const gpa = getNumericGpaFromMap(courseGPA, course.id);
+      if (gpa !== null && gpa >= 0) {
+        tcu += course.units;
+        twqp += course.units * gpa;
+      }
+    });
+    return {
+      TCU: tcu,
+      TWQP: twqp,
+      TGPA: tcu > 0 ? twqp / tcu : 0,
+    };
+  };
+
+  return (
+    <>
+      <div className="bg-indigo-900 text-white pb-20 pt-10 px-6 shadow-xl">
+        <div className="max-w-6xl mx-auto flex flex-col gap-6 md:flex-row md:justify-between md:items-center">
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <Calculator className="w-8 h-8 text-indigo-200" />
+              <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
+                GPA Calculator
+              </h1>
+            </div>
+            <p className="text-indigo-100 opacity-90 text-sm md:text-base">
+              Uses the Civil Engineering curriculum for per-term and overall TGPA.
+            </p>
+          </div>
+
+          <div className="bg-indigo-800/70 border border-indigo-400/60 rounded-xl px-4 py-3 text-xs md:text-sm max-w-sm">
+            <p className="font-semibold mb-1">Formula Reference</p>
+            <p className="font-mono text-[11px] leading-relaxed">
+              WQP = Course Units × Quality Point (GPA)
+              <br />
+              TCU = Σ Course Units
+              <br />
+              TWQP = Σ WQP
+              <br />
+              TGPA = TWQP / TCU
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-1 w-full">
+        <div className="max-w-6xl mx-auto px-4 -mt-16 pb-12">
+          {/* Overall GPA Summary */}
+          <div className="bg-white rounded-lg p-4 mb-8 shadow-md">
+            <h2 className="text-sm font-semibold text-slate-800 mb-2 flex items-center gap-2">
+              <BarChart3 className="w-4 h-4 text-indigo-600" />
+              Overall GPA Summary
+            </h2>
+
+            <div className="grid grid-cols-3 gap-4 text-xs">
+              <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                <div className="text-slate-500 uppercase tracking-wide text-[10px]">
+                  TCU
+                </div>
+                <div className="text-lg font-semibold text-slate-900">
+                  {TCU.toFixed(2)}
+                </div>
+                <div className="text-[10px] text-slate-400">
+                  Total Course Units (with GPA entered)
+                </div>
+              </div>
+
+              <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                <div className="text-slate-500 uppercase tracking-wide text-[10px]">
+                  TWQP
+                </div>
+                <div className="text-lg font-semibold text-slate-900">
+                  {TWQP.toFixed(3)}
+                </div>
+                <div className="text-[10px] text-slate-400">
+                  Total Weighted Quality Points
+                </div>
+              </div>
+
+              <div className="p-3 rounded-lg bg-indigo-50 border border-indigo-200">
+                <div className="text-indigo-600 uppercase tracking-wide text-[10px]">
+                  TGPA
+                </div>
+                <div className="text-lg font-bold text-indigo-800">
+                  {TGPA.toFixed(3)}
+                </div>
+                <div className="text-[10px] text-indigo-500">
+                  Overall Grade Point Average
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Per-year / per-term GPA inputs */}
+          <div className="space-y-6">
+            {CURRICULUM_DATA.map((year, yIdx) => (
+              <div
+                key={yIdx}
+                className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"
+              >
+                <div className="w-full flex justify-between items-center px-6 py-4 bg-slate-50 border-b border-slate-100">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center">
+                      <GraduationCap className="w-4 h-4 text-indigo-600" />
+                    </div>
+                    <div className="text-left">
+                      <h2 className="font-semibold text-slate-800">
+                        {year.year}
+                      </h2>
+                      <p className="text-[11px] text-slate-500">
+                        Select your final term GPA for each course. Labs with
+                        lecture co-requisites use the same GPA as their Lecture.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => resetYearGpa(year)}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-slate-300 text-[11px] text-slate-600 bg-white hover:bg-slate-50 transition"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    Reset GPA for this year level
+                  </button>
+                </div>
+
+                <div className="px-4 pb-4 pt-3">
+                  <div className="grid md:grid-cols-3 gap-4">
+                    {year.terms.map((term, tIdx) => {
+                      const stats = computeTermGpa(term);
+                      const totalUnitsTerm = term.courses.reduce(
+                        (acc, c) => acc + c.units,
+                        0
+                      );
+                      return (
+                        <div key={tIdx} className="flex flex-col">
+                          <div className="mb-3 flex justify-between items-center px-1">
+                            <div>
+                              <h3 className="font-semibold text-slate-700 uppercase tracking-wide text-sm">
+                                {term.termName}
+                              </h3>
+                              <p className="text-[11px] text-slate-400">
+                                {totalUnitsTerm} Units Total
+                              </p>
+                              {stats.TCU > 0 && (
+                                <p className="text-[11px] text-slate-500 mt-1">
+                                  <span className="font-semibold">
+                                    TGPA:
+                                  </span>{" "}
+                                  {stats.TGPA.toFixed(3)} ·{" "}
+                                  <span className="font-mono">
+                                    TCU={stats.TCU.toFixed(2)}, TWQP=
+                                    {stats.TWQP.toFixed(3)}
+                                  </span>
+                                </p>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => resetTermGpa(term)}
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-full border border-slate-300 text-[10px] text-slate-600 bg-white hover:bg-slate-50 transition"
+                            >
+                              <RotateCcw className="w-3 h-3" />
+                              Reset GPA for this term
+                            </button>
+                          </div>
+
+                          <div className="space-y-3 flex-grow">
+                            {term.courses.map((course) => {
+                              const gpa = getNumericGpaFromMap(
+                                courseGPA,
+                                course.id
+                              );
+                              const wqp =
+                                gpa !== null && gpa >= 0
+                                  ? course.units * gpa
+                                  : null;
+
+                              const isAutoLab = isAutoSyncedLabId(course.id);
+                              const lectureId = isAutoLab
+                                ? getCoreqLectureId(course.id)
+                                : null;
+                              const lectureGpaValue =
+                                lectureId &&
+                                courseGPA[lectureId] !== undefined
+                                  ? courseGPA[lectureId]
+                                  : "";
+
+                              return (
+                                <div
+                                  key={course.id}
+                                  className="relative p-4 rounded-xl border bg-white border-slate-200 hover:border-indigo-300 hover:shadow-md transition-all duration-200 flex justify-between items-start"
+                                >
+                                  <div className="flex-1 pr-3">
+                                    <div className="flex items-center gap-2 mb-1.5">
+                                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full tracking-wider bg-slate-100 text-slate-600">
+                                        {course.id}
+                                      </span>
+                                      {isLabCourse(course) && (
+                                        <span className="text-[9px] uppercase tracking-wide bg-slate-800 text-slate-50 px-1.5 py-0.5 rounded-full">
+                                          Laboratory
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    <h4 className="text-sm font-semibold leading-snug text-slate-800">
+                                      {course.title}
+                                    </h4>
+
+                                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                                      <span className="text-xs text-slate-500">
+                                        {course.units} Units
+                                      </span>
+
+                                      <div className="flex items-center gap-1 text-[11px] text-slate-500">
+                                        <span>GPA:</span>
+                                        {isAutoLab && lectureId ? (
+                                          <>
+                                            <select
+                                              className="w-20 px-1 py-0.5 text-[11px] border border-slate-300 rounded bg-slate-100 text-slate-500 cursor-not-allowed"
+                                              value={lectureGpaValue}
+                                              disabled
+                                            >
+                                              <option value="">-</option>
+                                              {GPA_OPTIONS.filter(
+                                                (o) => o !== ""
+                                              ).map((opt) => (
+                                                <option
+                                                  key={opt}
+                                                  value={opt}
+                                                >
+                                                  {opt}
+                                                </option>
+                                              ))}
+                                            </select>
+                                            <span className="text-[10px] text-slate-400">
+                                              (Same as {lectureId})
+                                            </span>
+                                          </>
+                                        ) : (
+                                          <select
+                                            className="w-20 px-1 py-0.5 text-[11px] border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                            value={courseGPA[course.id] ?? ""}
+                                            onChange={(e) =>
+                                              handleGpaChange(
+                                                course.id,
+                                                e.target.value
+                                              )
+                                            }
+                                          >
+                                            {GPA_OPTIONS.map((opt) => (
+                                              <option key={opt} value={opt}>
+                                                {opt === "" ? "-" : opt}
+                                              </option>
+                                            ))}
+                                          </select>
+                                        )}
+                                      </div>
+
+                                      {wqp !== null && (
+                                        <span className="text-[11px] text-indigo-700 font-mono bg-indigo-50 px-1.5 py-0.5 rounded">
+                                          WQP: {wqp.toFixed(3)}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* GPA DATA MANAGEMENT + FOOTER */}
+        <div className="w-full border-t border-slate-200 bg-slate-50/80">
+          <div className="max-w-6xl mx-auto px-4 py-6 space-y-4 text-sm text-slate-600">
+            {/* GPA Data Management Section */}
+            <section>
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
+                DATA MANAGEMENT (GPA)
+              </h2>
+              <p className="text-xs text-slate-500 mb-3">
+                Transfer your GPA data between environments, or create a backup of your GPA records only.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={exportGpaToClipboard}
+                  className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-400 transition"
+                >
+                  <Copy className="w-4 h-4" />
+                  Copy GPA Data
+                </button>
+                <button
+                  onClick={exportGpaToFile}
+                  className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-400 transition"
+                >
+                  <Download className="w-4 h-4" />
+                  Download GPA Backup
+                </button>
+                <button
+                  onClick={() => setShowGpaImportModal(true)}
+                  className="inline-flex items-center gap-2 px-3 py-2 bg-indigo-600 border border-indigo-600 rounded-lg text-xs font-medium text-white hover:bg-indigo-700 transition"
+                >
+                  <Upload className="w-4 h-4" />
+                  Import GPA Data
+                </button>
+              </div>
+            </section>
+
+            {/* GPA Import Modal */}
+            {showGpaImportModal && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-semibold text-slate-800">
+                      Import GPA Data
+                    </h3>
+                    <button
+                      onClick={() => {
+                        setShowGpaImportModal(false);
+                        setGpaImportText("");
+                      }}
+                      className="text-slate-400 hover:text-slate-600"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  <p className="text-sm text-slate-600 mb-4">
+                    Paste your exported GPA data below, or upload a GPA backup file to restore your GPA records.
+                  </p>
+
+                  <textarea
+                    value={gpaImportText}
+                    onChange={(e) => setGpaImportText(e.target.value)}
+                    placeholder='Paste your GPA JSON data here (e.g., {"COE0001":"1.5",...})'
+                    className="w-full h-32 p-3 border border-slate-300 rounded-lg text-sm font-mono resize-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+
+                  <div className="flex gap-2 mt-4">
+                    <button
+                      onClick={importGpaFromText}
+                      disabled={!gpaImportText.trim()}
+                      className="flex-1 bg-indigo-600 text-white py-2 px-4 rounded-lg text-sm font-medium hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Import from Text
+                    </button>
+                    <label className="flex-1">
+                      <input
+                        type="file"
+                        ref={gpaFileInputRef}
+                        accept=".json"
+                        onChange={handleGpaFileUpload}
+                        className="hidden"
+                      />
+                      <span className="block w-full text-center bg-slate-100 text-slate-700 py-2 px-4 rounded-lg text-sm font-medium hover:bg-slate-200 transition cursor-pointer">
+                        Upload File
+                      </span>
+                    </label>
+                  </div>
+
+                  <p className="text-xs text-slate-400 mt-4 text-center">
+                    This will replace your current GPA data.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="text-[11px] text-slate-500 border-t border-slate-200 pt-2">
+              GPA values are stored locally in your browser (localStorage). Clear your
+              browser storage if you want to reset all GPA inputs.
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+};
+
+// ---------------- ROOT APP WITH PAGE SWITCHER ----------------
+const App = () => {
+  const [courseStatus, setCourseStatus] = useState({});
+  const [courseGPA, setCourseGPA] = useState({});
+  const [errorMsg, setErrorMsg] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
+  const [activePage, setActivePage] = useState("tracker"); // "tracker" | "gpa"
+
+  useEffect(() => {
+    const savedData = localStorage.getItem("ce_tracker_data_v2");
+    if (savedData) {
+      setCourseStatus(JSON.parse(savedData));
+    }
+
+    const savedGpa = localStorage.getItem("ce_gpa_data_v1");
+    if (savedGpa) {
+      setCourseGPA(JSON.parse(savedGpa));
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("ce_tracker_data_v2", JSON.stringify(courseStatus));
+  }, [courseStatus]);
+
+  useEffect(() => {
+    localStorage.setItem("ce_gpa_data_v1", JSON.stringify(courseGPA));
+  }, [courseGPA]);
+
+  return (
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-800 flex flex-col">
+      <Analytics />
+      <SpeedInsights />
+
+      {/* Top navigation to switch pages */}
+      <header className="w-full bg-white border-b border-slate-200 sticky top-0 z-40">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <GraduationCap className="w-5 h-5 text-blue-700" />
+            <span className="font-semibold text-slate-800 text-sm md:text-base">
+              BSCE Academic Tools
+            </span>
+          </div>
+          <nav className="flex items-center gap-2 text-xs md:text-sm">
+            <button
+              type="button"
+              onClick={() => setActivePage("tracker")}
+              className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full border text-xs md:text-sm transition ${
+                activePage === "tracker"
+                  ? "bg-blue-600 text-white border-blue-600"
+                  : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+              }`}
+            >
+              <LayoutTemplate className="w-4 h-4" />
+              Curriculum Tracker
+            </button>
+            <button
+              type="button"
+              onClick={() => setActivePage("gpa")}
+              className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full border text-xs md:text-sm transition ${
+                activePage === "gpa"
+                  ? "bg-indigo-600 text-white border-indigo-600"
+                  : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+              }`}
+            >
+              <Calculator className="w-4 h-4" />
+              GPA Calculator
+            </button>
+          </nav>
+        </div>
+      </header>
+
+      {activePage === "tracker" ? (
+        <CurriculumTrackerPage
+          courseStatus={courseStatus}
+          setCourseStatus={setCourseStatus}
+          errorMsg={errorMsg}
+          setErrorMsg={setErrorMsg}
+          successMsg={successMsg}
+          setSuccessMsg={setSuccessMsg}
+        />
+      ) : (
+        <GpaCalculatorPage
+          courseGPA={courseGPA}
+          setCourseGPA={setCourseGPA}
+          errorMsg={errorMsg}
+          setErrorMsg={setErrorMsg}
+          successMsg={successMsg}
+          setSuccessMsg={setSuccessMsg}
+        />
+      )}
     </div>
   );
 };
