@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Check,
   Lock,
@@ -7,6 +7,10 @@ import {
   BarChart3,
   ChevronRight,
   GraduationCap,
+  Download,
+  Upload,
+  Copy,
+  X,
 } from "lucide-react";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/react";
@@ -214,6 +218,10 @@ const App = () => {
   const [courseStatus, setCourseStatus] = useState({});
   const [errorMsg, setErrorMsg] = useState("");
   const [expandedYear, setExpandedYear] = useState("First Year");
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importText, setImportText] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     const savedData = localStorage.getItem("ce_tracker_data_v2");
@@ -375,6 +383,85 @@ const App = () => {
     });
   };
 
+  // Export data to clipboard
+  const exportToClipboard = async () => {
+    try {
+      const data = localStorage.getItem("ce_tracker_data_v2") || "{}";
+      await navigator.clipboard.writeText(data);
+      setSuccessMsg("Data copied to clipboard! You can now paste it on the other site.");
+      setTimeout(() => setSuccessMsg(""), 4000);
+    } catch {
+      setErrorMsg("Failed to copy to clipboard. Please try the download option.");
+      setTimeout(() => setErrorMsg(""), 3000);
+    }
+  };
+
+  // Export data as downloadable JSON file
+  const exportToFile = () => {
+    const data = localStorage.getItem("ce_tracker_data_v2") || "{}";
+    const blob = new Blob([data], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `builders-progress-backup-${new Date().toISOString().split("T")[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setSuccessMsg("Data exported successfully!");
+    setTimeout(() => setSuccessMsg(""), 3000);
+  };
+
+  // Import data from pasted text
+  const importFromText = () => {
+    try {
+      const parsed = JSON.parse(importText.trim());
+      if (typeof parsed !== "object" || parsed === null) {
+        throw new Error("Invalid format");
+      }
+      const synced = syncLabsWithLectures(parsed);
+      setCourseStatus(synced);
+      setShowImportModal(false);
+      setImportText("");
+      setSuccessMsg("Data imported successfully!");
+      setTimeout(() => setSuccessMsg(""), 3000);
+    } catch {
+      setErrorMsg("Invalid data format. Please paste valid JSON data.");
+      setTimeout(() => setErrorMsg(""), 3000);
+    }
+  };
+
+  // Import data from file
+  const handleFileUpload = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result;
+        const parsed = JSON.parse(content);
+        if (typeof parsed !== "object" || parsed === null) {
+          throw new Error("Invalid format");
+        }
+        const synced = syncLabsWithLectures(parsed);
+        setCourseStatus(synced);
+        setShowImportModal(false);
+        setImportText("");
+        setSuccessMsg("Data imported successfully from file!");
+        setTimeout(() => setSuccessMsg(""), 3000);
+      } catch {
+        setErrorMsg("Invalid file format. Please select a valid backup file.");
+        setTimeout(() => setErrorMsg(""), 3000);
+      }
+    };
+    reader.readAsText(file);
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
   const totalUnits = CURRICULUM_DATA.reduce(
     (acc, year) =>
       acc +
@@ -513,6 +600,70 @@ const App = () => {
             <div className="fixed top-6 left-1/2 transform -translate-x-1/2 bg-white border-l-4 border-red-500 text-slate-700 px-6 py-4 rounded-r shadow-2xl z-50 flex items-center">
               <AlertCircle className="w-5 h-5 mr-3 text-red-500" />
               <span className="font-medium">{errorMsg}</span>
+            </div>
+          )}
+
+          {successMsg && (
+            <div className="fixed top-6 left-1/2 transform -translate-x-1/2 bg-white border-l-4 border-green-500 text-slate-700 px-6 py-4 rounded-r shadow-2xl z-50 flex items-center">
+              <Check className="w-5 h-5 mr-3 text-green-500" />
+              <span className="font-medium">{successMsg}</span>
+            </div>
+          )}
+
+          {/* Import Modal */}
+          {showImportModal && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-semibold text-slate-800">Import Data</h3>
+                  <button
+                    onClick={() => {
+                      setShowImportModal(false);
+                      setImportText("");
+                    }}
+                    className="text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <p className="text-sm text-slate-600 mb-4">
+                  Paste your exported data below, or upload a backup file to restore your progress.
+                </p>
+
+                <textarea
+                  value={importText}
+                  onChange={(e) => setImportText(e.target.value)}
+                  placeholder='Paste your JSON data here (e.g., {"COE0001":"passed",...})'
+                  className="w-full h-32 p-3 border border-slate-300 rounded-lg text-sm font-mono resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+
+                <div className="flex gap-2 mt-4">
+                  <button
+                    onClick={importFromText}
+                    disabled={!importText.trim()}
+                    className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg text-sm font-medium hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Import from Text
+                  </button>
+                  <label className="flex-1">
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      accept=".json"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                    />
+                    <span className="block w-full text-center bg-slate-100 text-slate-700 py-2 px-4 rounded-lg text-sm font-medium hover:bg-slate-200 transition cursor-pointer">
+                      Upload File
+                    </span>
+                  </label>
+                </div>
+
+                <p className="text-xs text-slate-400 mt-4 text-center">
+                  This will replace your current progress data.
+                </p>
+              </div>
             </div>
           )}
 
@@ -824,6 +975,39 @@ const App = () => {
         {/* PATCH NOTES + FOOTER */}
         <div className="w-full border-t border-slate-200 bg-slate-50/80">
           <div className="max-w-6xl mx-auto px-4 py-6 space-y-4 text-sm text-slate-600">
+            {/* Data Management Section */}
+            <section>
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
+                DATA MANAGEMENT
+              </h2>
+              <p className="text-xs text-slate-500 mb-3">
+                Transfer your progress between the main site and preview site, or create a backup of your data.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={exportToClipboard}
+                  className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-400 transition"
+                >
+                  <Copy className="w-4 h-4" />
+                  Copy to Clipboard
+                </button>
+                <button
+                  onClick={exportToFile}
+                  className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-400 transition"
+                >
+                  <Download className="w-4 h-4" />
+                  Download Backup
+                </button>
+                <button
+                  onClick={() => setShowImportModal(true)}
+                  className="inline-flex items-center gap-2 px-3 py-2 bg-blue-600 border border-blue-600 rounded-lg text-xs font-medium text-white hover:bg-blue-700 transition"
+                >
+                  <Upload className="w-4 h-4" />
+                  Import Data
+                </button>
+              </div>
+            </section>
+
             {/* Patch notes */}
             <section>
               <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
@@ -864,9 +1048,13 @@ const App = () => {
                   percentage and progress bar now reflect completed units only.
                 </li>
                 <li>
-                  Future versions will focus on UI refinements, export/backup
-                  options, and support for curriculum changes or elective
-                  tracks.
+                  <strong>v20:</strong> Added data import/export functionality to 
+                  transfer progress between the main site and preview site, or 
+                  create backups of your data.
+                </li>
+                <li>
+                  Future versions will focus on UI refinements and support for 
+                  curriculum changes or elective tracks.
                 </li>
               </ul>
             </section>
