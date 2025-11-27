@@ -13,6 +13,42 @@ This page is written in **plain language**, so you can focus on what matters: **
 
 ---
 
+## ✨ Features
+
+### 📋 Curriculum Tracker
+- **Card & List Views** – Toggle between detailed card view and compact spreadsheet-style list view
+- **"What Can I Take?" Filter** – Instantly see only the subjects you're eligible to enroll in (prerequisites passed)
+- **Chain Visualizer** – Hover over any subject to highlight all courses that depend on it
+- **Critical Path Warning** – Get warned when failing a subject will delay your graduation
+- **Prerequisite Tracking** – Visual indicators show which subjects are locked until prerequisites are passed
+- **Bulk Actions** – Mark all courses in a term or year as passed with one click
+
+### 🎨 Theme Customizer
+- **FEU Green** – Default school colors theme
+- **Dark Mode** – Perfect for late-night study sessions
+- **High Contrast** – Accessibility-focused with enhanced visibility
+
+### 📊 GPA Calculator
+- **Per-Term GPA** – Calculate your GPA for each term
+- **Overall TGPA** – Track your cumulative Total Grade Point Average
+- **Target Grade Calculator** – Set a Dean's Lister goal and see the average grade needed in remaining units
+- **Lab-Lecture Sync** – Laboratory courses automatically use the same GPA as their lecture co-requisite
+
+### 🎯 Progress & Planning
+- **Graduation Countdown** – Set your target graduation date and track terms remaining
+- **Shareable Progress Link** – Generate a URL to share your progress with advisers, parents, or friends
+- **Progress Dashboard** – See units completed, active, and remaining at a glance
+
+### 🎉 Engagement
+- **Confetti Celebrations** – Small burst when you pass a subject, big explosion when you complete a year!
+
+### 💾 Data Management
+- **Local Storage** – Progress saved in your browser, no account needed
+- **Export/Import** – Backup and restore your tracker or GPA data
+- **Cross-Site Transfer** – Move data between main site and preview environments
+
+---
+
 ## 🎯 What this tool is for
 
 This tracker helps **FEU Tech BSCE students** see where they are in the curriculum at a glance.
@@ -291,16 +327,20 @@ you’ll feel right at home with this tracker.
 
 ---
 
+
 ## 🧠 Technical note (optional, for the curious)
 
 This section is only for those who are curious about _how_ the tracker is built.
 
-- The interface is built using **React** (JavaScript UI library).
+- The interface is built using **React** (JavaScript UI library) with **Vite** as the build tool.
 - The **FEU Tech BSCE curriculum data** is stored in the project as a JavaScript data structure.
 - Styling relies on **Tailwind CSS** utility classes for a clean, modern look.
+- **react-confetti** library provides celebration animations.
+- Theme system uses a centralized configuration object for consistent styling across views.
+- URL-based state sharing uses **Base64 encoding** for progress links.
 - Your progress is saved in the browser with **`localStorage`**, so no external database is needed.
 
-If you’re not into coding, you can safely **skip this section**.  
+If you're not into coding, you can safely **skip this section**.  
 The tracker will still work perfectly for you.
 
 ---
@@ -313,6 +353,7 @@ If you’re a **BSCE student**, **faculty member**, or **adviser** at FEU Instit
 - Adding **electives** or **specializations**
 - Allowing **custom subjects** (credited courses, irregular loads, etc.)
 - Refining how **units** or **percentages** are calculated or displayed
+- Suggesting new features or themes
 
 you are very welcome to share your thoughts.
 
