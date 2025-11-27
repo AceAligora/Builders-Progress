@@ -405,13 +405,13 @@ const CurriculumTrackerPage = ({
     });
   };
 
-  // --- DATA MANAGEMENT (tracker only) ---
+  // --- DATA MANAGEMENT (tracker) ---
 
   const exportToClipboard = async () => {
     try {
       const data = localStorage.getItem("ce_tracker_data_v2") || "{}";
       await navigator.clipboard.writeText(data);
-      setSuccessMsg("Data copied to clipboard! You can now paste it on the other site.");
+      setSuccessMsg("Tracker data copied to clipboard!");
       setTimeout(() => setSuccessMsg(""), 4000);
     } catch (err) {
       console.error("Clipboard export failed:", err);
@@ -427,12 +427,12 @@ const CurriculumTrackerPage = ({
     const a = document.createElement("a");
     a.href = url;
     const dateStr = new Date().toISOString().split("T")[0];
-    a.download = `builders-progress-backup-${dateStr}.json`;
+    a.download = `builders-progress-tracker-backup-${dateStr}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    setSuccessMsg("Data exported successfully!");
+    setSuccessMsg("Tracker data exported successfully!");
     setTimeout(() => setSuccessMsg(""), 3000);
   };
 
@@ -446,7 +446,7 @@ const CurriculumTrackerPage = ({
       setCourseStatus(synced);
       setShowImportModal(false);
       setImportText("");
-      setSuccessMsg("Data imported successfully!");
+      setSuccessMsg("Tracker data imported successfully!");
       setTimeout(() => setSuccessMsg(""), 3000);
     } catch (err) {
       console.error("Import from text failed:", err);
@@ -471,7 +471,7 @@ const CurriculumTrackerPage = ({
         setCourseStatus(synced);
         setShowImportModal(false);
         setImportText("");
-        setSuccessMsg("Data imported successfully from file!");
+        setSuccessMsg("Tracker data imported successfully from file!");
         setTimeout(() => setSuccessMsg(""), 3000);
       } catch (err) {
         console.error("Import from file failed:", err);
@@ -995,10 +995,10 @@ const CurriculumTrackerPage = ({
             {/* Data Management Section */}
             <section>
               <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
-                DATA MANAGEMENT
+                DATA MANAGEMENT (Tracker)
               </h2>
               <p className="text-xs text-slate-500 mb-3">
-                Transfer your progress between the main site and preview site, or create a backup of your data.
+                Transfer your tracker progress between the main site and preview site, or create a backup of your data.
               </p>
               <div className="flex flex-wrap gap-2">
                 <button
@@ -1006,21 +1006,21 @@ const CurriculumTrackerPage = ({
                   className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-400 transition"
                 >
                   <Copy className="w-4 h-4" />
-                  Copy to Clipboard
+                  Copy Tracker Data
                 </button>
                 <button
                   onClick={exportToFile}
                   className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-400 transition"
                 >
                   <Download className="w-4 h-4" />
-                  Download Backup
+                  Download Tracker Backup
                 </button>
                 <button
                   onClick={() => setShowImportModal(true)}
                   className="inline-flex items-center gap-2 px-3 py-2 bg-blue-600 border border-blue-600 rounded-lg text-xs font-medium text-white hover:bg-blue-700 transition"
                 >
                   <Upload className="w-4 h-4" />
-                  Import Data
+                  Import Tracker Data
                 </button>
               </div>
             </section>
@@ -1070,9 +1070,9 @@ const CurriculumTrackerPage = ({
                   create backups of your data.
                 </li>
                 <li>
-                  <strong>v21+ (preview):</strong> Introduced separate Curriculum Tracker and GPA
-                  Calculator views (see top navigation) with lecture–lab GPA
-                  auto-sync and reset controls.
+                  <strong>v21+ (preview):</strong> Added separate Curriculum Tracker and GPA
+                  Calculator views with lecture–lab GPA auto-sync and GPA data
+                  management.
                 </li>
               </ul>
             </section>
@@ -1093,7 +1093,11 @@ const CurriculumTrackerPage = ({
 };
 
 // ---------------- GPA CALCULATOR PAGE ----------------
-const GpaCalculatorPage = ({ courseGPA, setCourseGPA }) => {
+const GpaCalculatorPage = ({ courseGPA, setCourseGPA, errorMsg, setErrorMsg, successMsg, setSuccessMsg }) => {
+  const [showGpaImportModal, setShowGpaImportModal] = useState(false);
+  const [gpaImportText, setGpaImportText] = useState("");
+  const gpaFileInputRef = useRef(null);
+
   // Sync lab GPAs when lecture GPA changes
   const syncLabGpasForLecture = (lectureId, nextMap) => {
     const updated = { ...nextMap };
@@ -1158,6 +1162,84 @@ const GpaCalculatorPage = ({ courseGPA, setCourseGPA }) => {
       );
       return next;
     });
+  };
+
+  // --- DATA MANAGEMENT (GPA) ---
+
+  const exportGpaToClipboard = async () => {
+    try {
+      const data = localStorage.getItem("ce_gpa_data_v1") || "{}";
+      await navigator.clipboard.writeText(data);
+      setSuccessMsg("GPA data copied to clipboard!");
+      setTimeout(() => setSuccessMsg(""), 4000);
+    } catch (err) {
+      console.error("GPA clipboard export failed:", err);
+      setErrorMsg("Failed to copy GPA data. Please try the download option.");
+      setTimeout(() => setErrorMsg(""), 3000);
+    }
+  };
+
+  const exportGpaToFile = () => {
+    const data = localStorage.getItem("ce_gpa_data_v1") || "{}";
+    const blob = new Blob([data], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const dateStr = new Date().toISOString().split("T")[0];
+    a.download = `builders-progress-gpa-backup-${dateStr}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setSuccessMsg("GPA data exported successfully!");
+    setTimeout(() => setSuccessMsg(""), 3000);
+  };
+
+  const importGpaFromText = () => {
+    try {
+      const parsed = JSON.parse(gpaImportText.trim());
+      if (typeof parsed !== "object" || parsed === null) {
+        throw new Error("Invalid format");
+      }
+      setCourseGPA(parsed);
+      setShowGpaImportModal(false);
+      setGpaImportText("");
+      setSuccessMsg("GPA data imported successfully!");
+      setTimeout(() => setSuccessMsg(""), 3000);
+    } catch (err) {
+      console.error("GPA import from text failed:", err);
+      setErrorMsg("Invalid GPA data format. Please paste valid JSON data.");
+      setTimeout(() => setErrorMsg(""), 3000);
+    }
+  };
+
+  const handleGpaFileUpload = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result;
+        const parsed = JSON.parse(content);
+        if (typeof parsed !== "object" || parsed === null) {
+          throw new Error("Invalid format");
+        }
+        setCourseGPA(parsed);
+        setShowGpaImportModal(false);
+        setGpaImportText("");
+        setSuccessMsg("GPA data imported successfully from file!");
+        setTimeout(() => setSuccessMsg(""), 3000);
+      } catch (err) {
+        console.error("GPA import from file failed:", err);
+        setErrorMsg("Invalid GPA backup file. Please select a valid file.");
+        setTimeout(() => setErrorMsg(""), 3000);
+      }
+    };
+    reader.readAsText(file);
+    if (gpaFileInputRef.current) {
+      gpaFileInputRef.current.value = "";
+    }
   };
 
   // Global totals
@@ -1460,12 +1542,105 @@ const GpaCalculatorPage = ({ courseGPA, setCourseGPA }) => {
           </div>
         </div>
 
+        {/* GPA DATA MANAGEMENT + FOOTER */}
         <div className="w-full border-t border-slate-200 bg-slate-50/80">
-          <div className="max-w-6xl mx-auto px-4 py-6 text-[11px] text-slate-500">
-            <p className="leading-relaxed">
+          <div className="max-w-6xl mx-auto px-4 py-6 space-y-4 text-sm text-slate-600">
+            {/* GPA Data Management Section */}
+            <section>
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
+                DATA MANAGEMENT (GPA)
+              </h2>
+              <p className="text-xs text-slate-500 mb-3">
+                Transfer your GPA data between environments, or create a backup of your GPA records only.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={exportGpaToClipboard}
+                  className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-400 transition"
+                >
+                  <Copy className="w-4 h-4" />
+                  Copy GPA Data
+                </button>
+                <button
+                  onClick={exportGpaToFile}
+                  className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-400 transition"
+                >
+                  <Download className="w-4 h-4" />
+                  Download GPA Backup
+                </button>
+                <button
+                  onClick={() => setShowGpaImportModal(true)}
+                  className="inline-flex items-center gap-2 px-3 py-2 bg-indigo-600 border border-indigo-600 rounded-lg text-xs font-medium text-white hover:bg-indigo-700 transition"
+                >
+                  <Upload className="w-4 h-4" />
+                  Import GPA Data
+                </button>
+              </div>
+            </section>
+
+            {/* GPA Import Modal */}
+            {showGpaImportModal && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-semibold text-slate-800">
+                      Import GPA Data
+                    </h3>
+                    <button
+                      onClick={() => {
+                        setShowGpaImportModal(false);
+                        setGpaImportText("");
+                      }}
+                      className="text-slate-400 hover:text-slate-600"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  <p className="text-sm text-slate-600 mb-4">
+                    Paste your exported GPA data below, or upload a GPA backup file to restore your GPA records.
+                  </p>
+
+                  <textarea
+                    value={gpaImportText}
+                    onChange={(e) => setGpaImportText(e.target.value)}
+                    placeholder='Paste your GPA JSON data here (e.g., {"COE0001":"1.5",...})'
+                    className="w-full h-32 p-3 border border-slate-300 rounded-lg text-sm font-mono resize-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+
+                  <div className="flex gap-2 mt-4">
+                    <button
+                      onClick={importGpaFromText}
+                      disabled={!gpaImportText.trim()}
+                      className="flex-1 bg-indigo-600 text-white py-2 px-4 rounded-lg text-sm font-medium hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Import from Text
+                    </button>
+                    <label className="flex-1">
+                      <input
+                        type="file"
+                        ref={gpaFileInputRef}
+                        accept=".json"
+                        onChange={handleGpaFileUpload}
+                        className="hidden"
+                      />
+                      <span className="block w-full text-center bg-slate-100 text-slate-700 py-2 px-4 rounded-lg text-sm font-medium hover:bg-slate-200 transition cursor-pointer">
+                        Upload File
+                      </span>
+                    </label>
+                  </div>
+
+                  <p className="text-xs text-slate-400 mt-4 text-center">
+                    This will replace your current GPA data.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="text-[11px] text-slate-500 border-t border-slate-200 pt-2">
               GPA values are stored locally in your browser (localStorage). Clear your
               browser storage if you want to reset all GPA inputs.
-            </p>
+            </div>
           </div>
         </div>
       </div>
@@ -1557,6 +1732,10 @@ const App = () => {
         <GpaCalculatorPage
           courseGPA={courseGPA}
           setCourseGPA={setCourseGPA}
+          errorMsg={errorMsg}
+          setErrorMsg={setErrorMsg}
+          successMsg={successMsg}
+          setSuccessMsg={setSuccessMsg}
         />
       )}
     </div>
