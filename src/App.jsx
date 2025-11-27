@@ -275,6 +275,8 @@ const THEMES = {
     takingBadge: "bg-green-500 text-green-50",
     progressBar: "from-green-500 to-emerald-400",
     navActive: "bg-green-600 text-white border-green-600",
+    highlightBg: "bg-yellow-100",
+    hoverHighlightBg: "bg-blue-50",
   },
   dark: {
     name: "Dark Mode",
@@ -303,6 +305,8 @@ const THEMES = {
     takingBadge: "bg-blue-500 text-blue-50",
     progressBar: "from-blue-500 to-cyan-400",
     navActive: "bg-blue-600 text-white border-blue-600",
+    highlightBg: "bg-yellow-900/30",
+    hoverHighlightBg: "bg-blue-900/30",
   },
   highContrast: {
     name: "High Contrast",
@@ -331,6 +335,8 @@ const THEMES = {
     takingBadge: "bg-yellow-400 text-black",
     progressBar: "from-yellow-400 to-yellow-300",
     navActive: "bg-yellow-400 text-black border-yellow-400",
+    highlightBg: "bg-yellow-900/50",
+    hoverHighlightBg: "bg-yellow-800/30",
   },
 };
 
@@ -407,14 +413,16 @@ const decodeStateFromURL = (base64) => {
 };
 
 // Calculate terms until graduation
+// Approximately 4 months per academic term
+const DAYS_PER_TERM = 120;
+
 const calculateTermsRemaining = (targetDate) => {
   if (!targetDate) return null;
   const now = new Date();
   const target = new Date(targetDate);
   const diffTime = target - now;
   const diffDays = diffTime / (1000 * 60 * 60 * 24);
-  // Assume ~4 months per term
-  const terms = Math.ceil(diffDays / 120);
+  const terms = Math.ceil(diffDays / DAYS_PER_TERM);
   return Math.max(0, terms);
 };
 
@@ -1055,8 +1063,9 @@ const CurriculumTrackerPage = ({
           <div className="space-y-6">
             {CURRICULUM_DATA.map((year, yIdx) => {
               // Filter courses for "What Can I Take" mode
-              const filteredTerms = year.terms.map(term => ({
+              const filteredTerms = year.terms.map((term, originalIdx) => ({
                 ...term,
+                originalIndex: originalIdx,
                 courses: showWhatCanITake 
                   ? term.courses.filter(course => 
                       canTakeCourse(course) && 
@@ -1148,8 +1157,8 @@ const CurriculumTrackerPage = ({
                                   <tr 
                                     key={course.id} 
                                     className={`border-b ${t.cardBorder} ${
-                                      isHighlighted ? 'bg-yellow-100 dark:bg-yellow-900/30' : 
-                                      isHovered ? 'bg-blue-50 dark:bg-blue-900/30' : ''
+                                      isHighlighted ? t.highlightBg : 
+                                      isHovered ? t.hoverHighlightBg : ''
                                     } ${status === 'passed' ? t.passedBg : ''}`}
                                     onMouseEnter={() => setHoveredCourse(course.id)}
                                     onMouseLeave={() => setHoveredCourse(null)}
@@ -1160,9 +1169,9 @@ const CurriculumTrackerPage = ({
                                     <td className="py-2 px-2 text-center">{term.termName}</td>
                                     <td className="py-2 px-2 text-center">
                                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                                        status === 'passed' ? 'bg-green-100 text-green-700' :
-                                        status === 'taking' ? 'bg-blue-100 text-blue-700' :
-                                        'bg-slate-100 text-slate-500'
+                                        status === 'passed' ? t.passedBadge :
+                                        status === 'taking' ? t.takingBadge :
+                                        `${t.secondaryBg} ${t.textMuted}`
                                       }`}>
                                         {status === 'passed' ? 'Passed' : status === 'taking' ? 'Active' : 'Inactive'}
                                       </span>
@@ -1223,14 +1232,14 @@ const CurriculumTrackerPage = ({
                             <div className="flex flex-col items-end gap-1">
                               <button
                                 type="button"
-                                onClick={() => markTermAsPassed(year.terms[tIdx])}
+                                onClick={() => markTermAsPassed(year.terms[term.originalIndex])}
                                 className={`text-[10px] px-2 py-1 rounded-full border border-green-500 text-green-700 ${t.accentBg} hover:opacity-80 transition`}
                               >
                                 Mark all courses this term as passed
                               </button>
                               <button
                                 type="button"
-                                onClick={() => resetTerm(year.terms[tIdx])}
+                                onClick={() => resetTerm(year.terms[term.originalIndex])}
                                 className={`text-[10px] px-2 py-1 rounded-full border ${t.cardBorder} ${t.textSecondary} ${t.cardBg} hover:opacity-80 transition`}
                               >
                                 Reset this term
@@ -1838,7 +1847,7 @@ const GpaCalculatorPage = ({ courseGPA, setCourseGPA, errorMsg, setErrorMsg, suc
                           🎉 You've already achieved this target!
                         </p>
                       ) : requiredGPA > 4.0 ? (
-                        <p className="text-sm text-red-600">
+                        <p className={`text-sm ${t.textSecondary}`}>
                           ⚠️ Unfortunately, this target may not be achievable with your current GPA.
                         </p>
                       ) : (
