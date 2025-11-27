@@ -390,7 +390,8 @@ const App = () => {
       await navigator.clipboard.writeText(data);
       setSuccessMsg("Data copied to clipboard! You can now paste it on the other site.");
       setTimeout(() => setSuccessMsg(""), 4000);
-    } catch {
+    } catch (err) {
+      console.error("Clipboard export failed:", err);
       setErrorMsg("Failed to copy to clipboard. Please try the download option.");
       setTimeout(() => setErrorMsg(""), 3000);
     }
@@ -403,7 +404,8 @@ const App = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `builders-progress-backup-${new Date().toISOString().split("T")[0]}.json`;
+    const dateStr = new Date().toISOString().split("T")[0];
+    a.download = `builders-progress-backup-${dateStr}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -425,7 +427,8 @@ const App = () => {
       setImportText("");
       setSuccessMsg("Data imported successfully!");
       setTimeout(() => setSuccessMsg(""), 3000);
-    } catch {
+    } catch (err) {
+      console.error("Import from text failed:", err);
       setErrorMsg("Invalid data format. Please paste valid JSON data.");
       setTimeout(() => setErrorMsg(""), 3000);
     }
@@ -450,7 +453,8 @@ const App = () => {
         setImportText("");
         setSuccessMsg("Data imported successfully from file!");
         setTimeout(() => setSuccessMsg(""), 3000);
-      } catch {
+      } catch (err) {
+        console.error("Import from file failed:", err);
         setErrorMsg("Invalid file format. Please select a valid backup file.");
         setTimeout(() => setErrorMsg(""), 3000);
       }
