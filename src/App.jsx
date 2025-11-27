@@ -278,12 +278,42 @@ const THEMES = {
     highlightBg: "bg-yellow-100",
     hoverHighlightBg: "bg-blue-50",
   },
+  acesTheme: {
+    name: "ACES Theme",
+    heroGradient: "from-aces-5 via-aces-4 to-aces-3",
+    heroBg: "bg-aces-5",
+    heroText: "text-aces-1",
+    heroAccent: "text-aces-2",
+    headerBg: "bg-white",
+    headerBorder: "border-aces-2",
+    cardBg: "bg-white",
+    cardBorder: "border-aces-2",
+    cardHover: "hover:border-aces-3",
+    primaryBtn: "bg-aces-4 hover:bg-aces-5 border-aces-4",
+    primaryBtnText: "text-white",
+    accentBg: "bg-aces-1",
+    accentBorder: "border-aces-2",
+    accentText: "text-aces-5",
+    secondaryBg: "bg-aces-1",
+    textPrimary: "text-slate-800",
+    textSecondary: "text-slate-600",
+    textMuted: "text-slate-400",
+    bodyBg: "bg-aces-1",
+    passedBg: "bg-aces-1",
+    passedBorder: "border-aces-3",
+    passedBadge: "bg-aces-2 text-aces-5",
+    takingBadge: "bg-aces-4 text-white",
+    progressBar: "from-aces-4 to-aces-3",
+    navActive: "bg-aces-4 text-white border-aces-4",
+    highlightBg: "bg-yellow-100",
+    hoverHighlightBg: "bg-aces-1",
+  },
   dark: {
     name: "Dark Mode",
     heroGradient: "from-slate-900 via-slate-800 to-slate-700",
     heroBg: "bg-slate-900",
-    heroText: "text-slate-300",
-    heroAccent: "text-slate-400",
+    heroText: "text-slate-100",
+    heroAccent: "text-slate-200",
     headerBg: "bg-slate-900",
     headerBorder: "border-slate-700",
     cardBg: "bg-slate-800",
@@ -297,7 +327,7 @@ const THEMES = {
     secondaryBg: "bg-slate-800",
     textPrimary: "text-slate-100",
     textSecondary: "text-slate-300",
-    textMuted: "text-slate-500",
+    textMuted: "text-slate-400",
     bodyBg: "bg-slate-900",
     passedBg: "bg-slate-700",
     passedBorder: "border-blue-500",
@@ -327,7 +357,7 @@ const THEMES = {
     secondaryBg: "bg-gray-900",
     textPrimary: "text-white",
     textSecondary: "text-yellow-200",
-    textMuted: "text-gray-400",
+    textMuted: "text-yellow-300",
     bodyBg: "bg-black",
     passedBg: "bg-green-900",
     passedBorder: "border-green-400",
@@ -340,12 +370,12 @@ const THEMES = {
   },
 };
 
-// Dean's lister GWA thresholds
+// Dean's lister GPA thresholds
 const DEAN_LISTER_TARGETS = [
-  { label: "Gold Dean's Lister", gwa: 1.0 },
-  { label: "Silver Dean's Lister", gwa: 1.5 },
-  { label: "Bronze Dean's Lister", gwa: 1.75 },
-  { label: "Dean's Lister", gwa: 2.0 },
+  { label: "Gold Dean's Lister", gpa: 3.8 },
+  { label: "Silver Dean's Lister", gpa: 3.6 },
+  { label: "Bronze Dean's Lister", gpa: 3.4 },
+  { label: "Passing Grade", gpa: 1.0 },
 ];
 
 // Helper to build dependency chain (subjects that depend on a given subject)
@@ -412,18 +442,88 @@ const decodeStateFromURL = (base64) => {
   }
 };
 
-// Calculate terms until graduation
-// Approximately 4 months per academic term
-const DAYS_PER_TERM = 120;
+// Calculate terms remaining based on year entered college
+// Standard 4-year program with 3 terms per academic year = 12 terms total
+const TERMS_PER_YEAR = 3;
+const TOTAL_PROGRAM_YEARS = 4;
+const TOTAL_TERMS = TERMS_PER_YEAR * TOTAL_PROGRAM_YEARS;
 
-const calculateTermsRemaining = (targetDate) => {
-  if (!targetDate) return null;
+const calculateTermsRemaining = (yearEnteredCollege) => {
+  if (!yearEnteredCollege) return null;
+  
+  const enteredYear = parseInt(yearEnteredCollege, 10);
+  if (isNaN(enteredYear)) return null;
+  
   const now = new Date();
-  const target = new Date(targetDate);
-  const diffTime = target - now;
-  const diffDays = diffTime / (1000 * 60 * 60 * 24);
-  const terms = Math.ceil(diffDays / DAYS_PER_TERM);
-  return Math.max(0, terms);
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth(); // 0-11
+  
+  // Estimate current term based on month (simplified: Aug-Nov=T1, Dec-Mar=T2, Apr-Jul=T3)
+  let currentTermInYear;
+  if (currentMonth >= 7 && currentMonth <= 10) {
+    currentTermInYear = 1; // Term 1 (Aug-Nov)
+  } else if (currentMonth >= 11 || currentMonth <= 2) {
+    currentTermInYear = 2; // Term 2 (Dec-Mar)
+  } else {
+    currentTermInYear = 3; // Term 3 (Apr-Jul)
+  }
+  
+  // Calculate years elapsed since entering college
+  const yearsElapsed = currentYear - enteredYear;
+  
+  // Calculate terms elapsed
+  const termsElapsed = (yearsElapsed * TERMS_PER_YEAR) + currentTermInYear;
+  
+  // Calculate remaining terms
+  const termsRemaining = Math.max(0, TOTAL_TERMS - termsElapsed + 1);
+  
+  return termsRemaining;
+};
+
+// Calculate delay terms when unmarking a course as passed
+const calculateDelayTerms = (courseId, yearEnteredCollege) => {
+  // Get the course's scheduled term in the curriculum
+  let courseYearIndex = -1;
+  let courseTermIndex = -1;
+  
+  CURRICULUM_DATA.forEach((year, yIdx) => {
+    year.terms.forEach((term, tIdx) => {
+      term.courses.forEach((course) => {
+        if (course.id === courseId) {
+          courseYearIndex = yIdx;
+          courseTermIndex = tIdx;
+        }
+      });
+    });
+  });
+  
+  if (courseYearIndex === -1) return 1; // Default to 1 term if course not found
+  
+  // Calculate the term number in the curriculum (1-12)
+  const courseTermNumber = (courseYearIndex * TERMS_PER_YEAR) + courseTermIndex + 1;
+  
+  // Get dependents and find the furthest term
+  const dependents = getAllDependents(courseId);
+  let maxTermDelay = 0;
+  
+  dependents.forEach((depId) => {
+    CURRICULUM_DATA.forEach((year, yIdx) => {
+      year.terms.forEach((term, tIdx) => {
+        term.courses.forEach((course) => {
+          if (course.id === depId) {
+            const depTermNumber = (yIdx * TERMS_PER_YEAR) + tIdx + 1;
+            const termDiff = depTermNumber - courseTermNumber;
+            if (termDiff > maxTermDelay) {
+              maxTermDelay = termDiff;
+            }
+          }
+        });
+      });
+    });
+  });
+  
+  // At minimum, delay by 1 term (the next offering of this course)
+  return Math.max(1, maxTermDelay);
 };
 
 // GPA helpers
@@ -450,10 +550,9 @@ const CurriculumTrackerPage = ({
   setShowWhatCanITake,
   hoveredCourse,
   setHoveredCourse,
-  graduationDate,
-  setGraduationDate,
+  yearEnteredCollege,
+  setYearEnteredCollege,
   courseGPA,
-  onShareLink,
   onConfetti,
 }) => {
   const [expandedYear, setExpandedYear] = useState("First Year");
@@ -548,9 +647,10 @@ const CurriculumTrackerPage = ({
       if (dependents.length > 0) {
         const dependentTitles = dependents.slice(0, 3).map(id => getCourseTitle(id));
         const moreCount = dependents.length > 3 ? ` and ${dependents.length - 3} more` : "";
+        const delayTerms = calculateDelayTerms(courseId, yearEnteredCollege);
         setCriticalPathWarning({
           courseId,
-          message: `Delay Warning: This will delay your graduation by at least 1 term because it unlocks: ${dependentTitles.join(", ")}${moreCount}`,
+          message: `Delay Warning: This will delay your graduation by at least ${delayTerms} term${delayTerms !== 1 ? 's' : ''} because it unlocks: ${dependentTitles.join(", ")}${moreCount}`,
         });
         setTimeout(() => setCriticalPathWarning(null), 6000);
       }
@@ -826,7 +926,7 @@ const CurriculumTrackerPage = ({
   const barWidth = percentage === 0 ? 0 : Math.max(4, percentage);
 
   // Calculate terms remaining
-  const termsRemaining = calculateTermsRemaining(graduationDate);
+  const termsRemaining = calculateTermsRemaining(yearEnteredCollege);
 
   return (
     <>
@@ -973,7 +1073,7 @@ const CurriculumTrackerPage = ({
             </div>
           )}
 
-          {/* TOOLBAR - View Toggle, What Can I Take, Share Link */}
+          {/* TOOLBAR - View Toggle, What Can I Take */}
           <div className={`${t.cardBg} rounded-lg p-3 mb-4 shadow-md flex flex-wrap items-center justify-between gap-3`}>
             <div className="flex items-center gap-2">
               {/* View Mode Toggle */}
@@ -1017,24 +1117,18 @@ const CurriculumTrackerPage = ({
             </div>
 
             <div className="flex items-center gap-2">
-              {/* Share Link Button */}
-              <button
-                onClick={onShareLink}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5 border ${t.cardBorder} ${t.textSecondary} hover:${t.textPrimary}`}
-              >
-                <Share2 className="w-3.5 h-3.5" />
-                Share Progress
-              </button>
-
-              {/* Graduation Date Picker */}
+              {/* Year Entered College Input */}
               <div className="flex items-center gap-1.5">
                 <Calendar className={`w-3.5 h-3.5 ${t.textMuted}`} />
+                <label className={`text-xs ${t.textSecondary}`}>Year Entered College:</label>
                 <input
-                  type="date"
-                  value={graduationDate}
-                  onChange={(e) => setGraduationDate(e.target.value)}
-                  className={`px-2 py-1 rounded border ${t.cardBorder} ${t.cardBg} ${t.textPrimary} text-xs`}
-                  placeholder="Target Graduation"
+                  type="number"
+                  min="2000"
+                  max="2100"
+                  value={yearEnteredCollege}
+                  onChange={(e) => setYearEnteredCollege(e.target.value)}
+                  className={`w-20 px-2 py-1 rounded border ${t.cardBorder} ${t.cardBg} ${t.textPrimary} text-xs`}
+                  placeholder="e.g. 2022"
                 />
               </div>
             </div>
@@ -1499,18 +1593,9 @@ const CurriculumTrackerPage = ({
               <h2 className={`text-xs font-semibold uppercase tracking-wide ${t.textMuted} mb-2`}>
                 PATCH NOTES
               </h2>
-              <ul className="text-xs space-y-1 list-disc pl-4">
-                <li>
-                  <strong>v22:</strong> Added Compact vs Card View toggle, Theme Customizer
-                  (FEU Green, Dark Mode, High Contrast), "What Can I Take?" filter,
-                  Chain Visualizer, Critical Path Warning, Target Grade Calculator, 
-                  Shareable State Link, Graduation Countdown, and Confetti celebrations.
-                </li>
-                <li>
-                  <strong>v21+:</strong> Added separate Curriculum Tracker and GPA
-                  Calculator views with lecture-lab GPA auto-sync and data management.
-                </li>
-              </ul>
+              <p className={`text-xs ${t.textSecondary}`}>
+                Development of this website is on-going, and this is a pre-release. It might have some issues with the functionality of the site.
+              </p>
             </section>
 
             {/* Footer disclaimer */}
@@ -1529,10 +1614,11 @@ const CurriculumTrackerPage = ({
 };
 
 // ---------------- GPA CALCULATOR PAGE ----------------
-const GpaCalculatorPage = ({ courseGPA, setCourseGPA, errorMsg, setErrorMsg, successMsg, setSuccessMsg, theme, remainingUnits }) => {
+const GpaCalculatorPage = ({ courseGPA, setCourseGPA, errorMsg, setErrorMsg, successMsg, setSuccessMsg, theme }) => {
   const [showGpaImportModal, setShowGpaImportModal] = useState(false);
   const [gpaImportText, setGpaImportText] = useState("");
-  const [targetGWA, setTargetGWA] = useState("");
+  const [targetGPA, setTargetGPA] = useState("");
+  const [manualRemainingUnits, setManualRemainingUnits] = useState("");
   const gpaFileInputRef = useRef(null);
   const t = THEMES[theme];
 
@@ -1698,22 +1784,25 @@ const GpaCalculatorPage = ({ courseGPA, setCourseGPA, errorMsg, setErrorMsg, suc
 
   const TGPA = TCU > 0 ? TWQP / TCU : 0;
 
+  // Parse manual remaining units (independent from curriculum tracker)
+  const parsedRemainingUnits = manualRemainingUnits ? parseFloat(manualRemainingUnits) : 0;
+
   // Calculate required GPA for target
-  const calculateRequiredGPA = (targetGWA) => {
-    if (!targetGWA || remainingUnits <= 0) return null;
-    const target = parseFloat(targetGWA);
+  const calculateRequiredGPA = (targetGPAValue) => {
+    if (!targetGPAValue || parsedRemainingUnits <= 0) return null;
+    const target = parseFloat(targetGPAValue);
     if (isNaN(target)) return null;
     
     // Total target = (current TWQP + remaining_units * required_avg) / (TCU + remaining_units) = target
     // required_avg = (target * (TCU + remaining_units) - current TWQP) / remaining_units
-    const totalUnitsWithRemaining = TCU + remainingUnits;
+    const totalUnitsWithRemaining = TCU + parsedRemainingUnits;
     const requiredTotal = target * totalUnitsWithRemaining;
-    const requiredForRemaining = (requiredTotal - TWQP) / remainingUnits;
+    const requiredForRemaining = (requiredTotal - TWQP) / parsedRemainingUnits;
     
     return requiredForRemaining;
   };
 
-  const requiredGPA = calculateRequiredGPA(targetGWA);
+  const requiredGPA = calculateRequiredGPA(targetGPA);
 
   const computeTermGpa = (term) => {
     let tcu = 0;
@@ -1818,27 +1907,41 @@ const GpaCalculatorPage = ({ courseGPA, setCourseGPA, errorMsg, setErrorMsg, suc
               Target Grade Calculator
             </h2>
             
-            <div className="flex flex-wrap items-center gap-4">
-              <div className="flex items-center gap-2">
-                <label className={`text-xs ${t.textSecondary}`}>I want to achieve:</label>
-                <select
-                  value={targetGWA}
-                  onChange={(e) => setTargetGWA(e.target.value)}
-                  className={`px-3 py-1.5 rounded border ${t.cardBorder} ${t.cardBg} ${t.textPrimary} text-sm`}
-                >
-                  <option value="">Select target...</option>
-                  {DEAN_LISTER_TARGETS.map((target) => (
-                    <option key={target.gwa} value={target.gwa}>
-                      {target.label} ({target.gwa} GWA)
-                    </option>
-                  ))}
-                  <option value="2.25">2.25 GWA</option>
-                  <option value="2.5">2.5 GWA</option>
-                  <option value="3.0">3.0 GWA</option>
-                </select>
+            <div className="flex flex-wrap items-start gap-4">
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center gap-2">
+                  <label className={`text-xs ${t.textSecondary}`}>I want to achieve:</label>
+                  <select
+                    value={targetGPA}
+                    onChange={(e) => setTargetGPA(e.target.value)}
+                    className={`px-3 py-1.5 rounded border ${t.cardBorder} ${t.cardBg} ${t.textPrimary} text-sm`}
+                  >
+                    <option value="">Select target...</option>
+                    {DEAN_LISTER_TARGETS.map((target) => (
+                      <option key={target.gpa} value={target.gpa}>
+                        {target.label} (≥ {target.gpa} GPA)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <label className={`text-xs ${t.textSecondary}`}>My remaining units:</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="300"
+                    step="1"
+                    value={manualRemainingUnits}
+                    onChange={(e) => setManualRemainingUnits(e.target.value)}
+                    placeholder="Enter units"
+                    className={`w-24 px-3 py-1.5 rounded border ${t.cardBorder} ${t.cardBg} ${t.textPrimary} text-sm`}
+                  />
+                  <span className={`text-xs ${t.textMuted}`}>(independent from tracker)</span>
+                </div>
               </div>
               
-              {targetGWA && remainingUnits > 0 && (
+              {targetGPA && parsedRemainingUnits > 0 && (
                 <div className={`flex-1 p-3 rounded-lg ${t.accentBg} border ${t.accentBorder}`}>
                   {requiredGPA !== null && (
                     <div>
@@ -1852,7 +1955,7 @@ const GpaCalculatorPage = ({ courseGPA, setCourseGPA, errorMsg, setErrorMsg, suc
                         </p>
                       ) : (
                         <p className={`text-sm ${t.textPrimary}`}>
-                          📊 You need to average <span className={`font-bold ${t.accentText}`}>{requiredGPA.toFixed(2)}</span> in your remaining <span className="font-bold">{remainingUnits}</span> units to hit this goal.
+                          📊 You need to average <span className={`font-bold ${t.accentText}`}>{requiredGPA.toFixed(2)}</span> in your remaining <span className="font-bold">{parsedRemainingUnits}</span> units to hit this goal.
                         </p>
                       )}
                     </div>
@@ -2154,23 +2257,244 @@ const GpaCalculatorPage = ({ courseGPA, setCourseGPA, errorMsg, setErrorMsg, suc
   );
 };
 
+// ---------------- CHAIN VISUALIZER PAGE ----------------
+const ChainVisualizerPage = ({ theme, courseStatus }) => {
+  const [hoveredCourse, setHoveredCourse] = useState(null);
+  const t = THEMES[theme];
+
+  // Get all courses with their positions
+  const allCourses = useMemo(() => {
+    const courses = [];
+    CURRICULUM_DATA.forEach((year, yIdx) => {
+      year.terms.forEach((term, tIdx) => {
+        term.courses.forEach((course) => {
+          courses.push({
+            ...course,
+            yearIndex: yIdx,
+            termIndex: tIdx,
+            yearName: year.year,
+            termName: term.termName,
+          });
+        });
+      });
+    });
+    return courses;
+  }, []);
+
+  // Get highlighted courses (dependents of hovered course)
+  const highlightedCourses = useMemo(() => {
+    if (!hoveredCourse) return new Set();
+    return new Set(getAllDependents(hoveredCourse));
+  }, [hoveredCourse]);
+
+  // Get prerequisites for highlighting
+  const prerequisiteCourses = useMemo(() => {
+    if (!hoveredCourse) return new Set();
+    const course = allCourses.find(c => c.id === hoveredCourse);
+    if (!course) return new Set();
+    return new Set(course.prereqs);
+  }, [hoveredCourse, allCourses]);
+
+  // Calculate grid positions
+  const getGridPosition = (yearIndex, termIndex) => {
+    const col = yearIndex * 3 + termIndex;
+    return col;
+  };
+
+  // Group courses by column (term)
+  const coursesByColumn = useMemo(() => {
+    const columns = {};
+    allCourses.forEach((course) => {
+      const col = getGridPosition(course.yearIndex, course.termIndex);
+      if (!columns[col]) columns[col] = [];
+      columns[col].push(course);
+    });
+    return columns;
+  }, [allCourses]);
+
+  const totalColumns = 12; // 4 years * 3 terms
+
+  return (
+    <>
+      <div className={`${t.heroBg} text-white pb-6 pt-10 px-6 shadow-xl`}>
+        <div className="max-w-7xl mx-auto">
+          <div className="flex items-center gap-3 mb-2">
+            <Link2 className={`w-8 h-8 ${t.heroAccent}`} />
+            <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
+              Chain Visualizer
+            </h1>
+          </div>
+          <p className={`${t.heroText} opacity-90 text-sm md:text-base`}>
+            Hover over a course to see its prerequisite chain and all dependent courses.
+          </p>
+          <div className={`mt-3 flex gap-4 text-xs ${t.heroText}`}>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded bg-blue-500"></div>
+              <span>Hovered Course</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded bg-orange-400"></div>
+              <span>Prerequisites</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded bg-yellow-400"></div>
+              <span>Dependent Courses (at risk if failed)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Whiteboard-like visualization area */}
+      <div className="flex-1 w-full overflow-x-auto">
+        <div 
+          className={`min-h-screen p-6 ${t.bodyBg}`}
+          style={{
+            backgroundImage: `
+              linear-gradient(to right, ${theme === 'dark' || theme === 'highContrast' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)'} 1px, transparent 1px),
+              linear-gradient(to bottom, ${theme === 'dark' || theme === 'highContrast' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)'} 1px, transparent 1px)
+            `,
+            backgroundSize: '20px 20px',
+          }}
+        >
+          <div className="max-w-7xl mx-auto">
+            {/* Column Headers */}
+            <div 
+              className="grid gap-2 mb-4" 
+              style={{ gridTemplateColumns: `repeat(${totalColumns}, minmax(120px, 1fr))` }}
+            >
+              {Array.from({ length: totalColumns }, (_, i) => {
+                const yearIdx = Math.floor(i / 3);
+                const termIdx = i % 3;
+                const yearNames = ["First Year", "Second Year", "Third Year", "Fourth Year"];
+                return (
+                  <div 
+                    key={i} 
+                    className={`text-center p-2 rounded-lg ${t.accentBg} border ${t.accentBorder}`}
+                  >
+                    <div className={`text-[10px] font-semibold ${t.accentText}`}>
+                      {yearNames[yearIdx]}
+                    </div>
+                    <div className={`text-[9px] ${t.textMuted}`}>
+                      Term {termIdx + 1}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Course Grid */}
+            <div 
+              className="grid gap-2" 
+              style={{ gridTemplateColumns: `repeat(${totalColumns}, minmax(120px, 1fr))` }}
+            >
+              {Array.from({ length: totalColumns }, (_, colIdx) => {
+                const courses = coursesByColumn[colIdx] || [];
+                return (
+                  <div key={colIdx} className="space-y-2">
+                    {courses.map((course) => {
+                      const status = courseStatus[course.id] || "inactive";
+                      const isHovered = hoveredCourse === course.id;
+                      const isHighlighted = highlightedCourses.has(course.id);
+                      const isPrereq = prerequisiteCourses.has(course.id);
+                      const isAutoLab = isAutoSyncedLabId(course.id);
+
+                      let bgColor = t.cardBg;
+                      let borderColor = t.cardBorder;
+                      let ringStyle = "";
+
+                      if (isHovered) {
+                        bgColor = "bg-blue-100";
+                        borderColor = "border-blue-500";
+                        ringStyle = "ring-2 ring-blue-500";
+                      } else if (isPrereq) {
+                        bgColor = "bg-orange-100";
+                        borderColor = "border-orange-400";
+                        ringStyle = "ring-2 ring-orange-400";
+                      } else if (isHighlighted) {
+                        bgColor = "bg-yellow-100";
+                        borderColor = "border-yellow-400";
+                        ringStyle = "ring-2 ring-yellow-400";
+                      } else if (status === "passed") {
+                        bgColor = t.passedBg;
+                        borderColor = t.passedBorder;
+                      }
+
+                      return (
+                        <div
+                          key={course.id}
+                          onMouseEnter={() => setHoveredCourse(course.id)}
+                          onMouseLeave={() => setHoveredCourse(null)}
+                          className={`p-2 rounded-lg border ${bgColor} ${borderColor} ${ringStyle} transition-all duration-200 cursor-pointer hover:shadow-lg ${
+                            isAutoLab ? 'opacity-60' : ''
+                          }`}
+                        >
+                          <div className={`text-[9px] font-mono font-bold ${
+                            isHovered || isHighlighted || isPrereq ? 'text-slate-700' : t.textMuted
+                          }`}>
+                            {course.id}
+                          </div>
+                          <div className={`text-[10px] font-medium leading-tight ${
+                            isHovered || isHighlighted || isPrereq ? 'text-slate-800' : t.textPrimary
+                          }`}>
+                            {course.title.length > 30 
+                              ? course.title.substring(0, 30) + "..." 
+                              : course.title}
+                          </div>
+                          <div className={`text-[8px] mt-1 ${
+                            isHovered || isHighlighted || isPrereq ? 'text-slate-600' : t.textMuted
+                          }`}>
+                            {course.units} units
+                            {course.prereqs.length > 0 && (
+                              <span className="ml-1">
+                                • {course.prereqs.length} prereq{course.prereqs.length > 1 ? 's' : ''}
+                              </span>
+                            )}
+                          </div>
+                          {status === "passed" && (
+                            <div className={`text-[8px] mt-1 ${t.passedBadge} px-1 py-0.5 rounded inline-block`}>
+                              Passed
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Legend and Info */}
+            <div className={`mt-8 p-4 ${t.cardBg} rounded-lg border ${t.cardBorder}`}>
+              <h3 className={`text-sm font-semibold ${t.textPrimary} mb-2`}>How to Use</h3>
+              <p className={`text-xs ${t.textSecondary}`}>
+                Hover over any course to visualize its prerequisite chain. Courses highlighted in <span className="text-yellow-600 font-semibold">yellow</span> are dependent on the hovered course - failing the hovered course will delay these subjects. Courses in <span className="text-orange-600 font-semibold">orange</span> are prerequisites for the hovered course.
+              </p>
+              <p className={`text-xs ${t.textMuted} mt-2`}>
+                This visualization helps you understand the consequences of failing a course and plan your academic path accordingly.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+};
+
 // ---------------- ROOT APP WITH PAGE SWITCHER ----------------
 const App = () => {
   const [courseStatus, setCourseStatus] = useState({});
   const [courseGPA, setCourseGPA] = useState({});
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
-  const [activePage, setActivePage] = useState("tracker"); // "tracker" | "gpa"
-  const [theme, setTheme] = useState("feuGreen"); // "feuGreen" | "dark" | "highContrast"
+  const [activePage, setActivePage] = useState("tracker"); // "tracker" | "gpa" | "visualizer"
+  const [theme, setTheme] = useState("feuGreen"); // "feuGreen" | "acesTheme" | "dark" | "highContrast"
   const [viewMode, setViewMode] = useState("card"); // "card" | "list"
   const [showWhatCanITake, setShowWhatCanITake] = useState(false);
   const [hoveredCourse, setHoveredCourse] = useState(null);
-  const [graduationDate, setGraduationDate] = useState("");
+  const [yearEnteredCollege, setYearEnteredCollege] = useState("");
   const [showConfetti, setShowConfetti] = useState(false);
   const [confettiSize, setConfettiSize] = useState("small");
   const [showThemeModal, setShowThemeModal] = useState(false);
-  const [showShareModal, setShowShareModal] = useState(false);
-  const [shareUrl, setShareUrl] = useState("");
   
   const t = THEMES[theme];
 
@@ -2184,7 +2508,7 @@ const App = () => {
       if (decoded) {
         setCourseStatus(decoded.courseStatus);
         setCourseGPA(decoded.courseGPA);
-        if (decoded.graduationDate) setGraduationDate(decoded.graduationDate);
+        if (decoded.graduationDate) setYearEnteredCollege(decoded.graduationDate);
         setSuccessMsg("Progress loaded from shared link!");
         setTimeout(() => setSuccessMsg(""), 3000);
         return;
@@ -2207,9 +2531,9 @@ const App = () => {
       setTheme(savedTheme);
     }
     
-    const savedGradDate = localStorage.getItem("ce_graduation_date");
-    if (savedGradDate) {
-      setGraduationDate(savedGradDate);
+    const savedYearEntered = localStorage.getItem("ce_year_entered");
+    if (savedYearEntered) {
+      setYearEnteredCollege(savedYearEntered);
     }
     
     const savedViewMode = localStorage.getItem("ce_view_mode");
@@ -2231,8 +2555,8 @@ const App = () => {
   }, [theme]);
   
   useEffect(() => {
-    localStorage.setItem("ce_graduation_date", graduationDate);
-  }, [graduationDate]);
+    localStorage.setItem("ce_year_entered", yearEnteredCollege);
+  }, [yearEnteredCollege]);
   
   useEffect(() => {
     localStorage.setItem("ce_view_mode", viewMode);
@@ -2244,55 +2568,6 @@ const App = () => {
     setShowConfetti(true);
     setTimeout(() => setShowConfetti(false), size === "big" ? 5000 : 2000);
   }, []);
-
-  // Handle share link generation
-  const handleShareLink = useCallback(() => {
-    const encoded = encodeStateToURL(courseStatus, courseGPA, graduationDate);
-    const url = `${window.location.origin}${window.location.pathname}?state=${encoded}`;
-    setShareUrl(url);
-    setShowShareModal(true);
-  }, [courseStatus, courseGPA, graduationDate]);
-
-  const copyShareUrl = async () => {
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      setSuccessMsg("Link copied to clipboard!");
-      setTimeout(() => setSuccessMsg(""), 3000);
-    } catch (err) {
-      setErrorMsg("Failed to copy link");
-      setTimeout(() => setErrorMsg(""), 3000);
-    }
-  };
-
-  // Calculate remaining units for target grade calculator
-  const totalUnits = CURRICULUM_DATA.reduce(
-    (acc, year) =>
-      acc +
-      year.terms.reduce(
-        (tAcc, term) =>
-          tAcc +
-          term.courses.reduce((cAcc, course) => cAcc + course.units, 0),
-        0
-      ),
-    0
-  );
-
-  const completedUnits = Object.keys(courseStatus).reduce((acc, id) => {
-    if (courseStatus[id] === "passed") {
-      let units = 0;
-      CURRICULUM_DATA.forEach((y) =>
-        y.terms.forEach((t) =>
-          t.courses.forEach((c) => {
-            if (c.id === id) units = c.units;
-          })
-        )
-      );
-      return acc + units;
-    }
-    return acc;
-  }, 0);
-
-  const remainingUnits = Math.max(totalUnits - completedUnits, 0);
 
   return (
     <div className={`min-h-screen ${t.bodyBg} font-sans ${t.textPrimary} flex flex-col`}>
@@ -2308,39 +2583,6 @@ const App = () => {
           numberOfPieces={confettiSize === "big" ? 500 : 100}
           gravity={confettiSize === "big" ? 0.3 : 0.5}
         />
-      )}
-
-      {/* Share Modal */}
-      {showShareModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className={`${t.cardBg} rounded-xl shadow-2xl max-w-md w-full p-6`}>
-            <div className="flex justify-between items-center mb-4">
-              <h3 className={`text-lg font-semibold ${t.textPrimary} flex items-center gap-2`}>
-                <Share2 className="w-5 h-5" />
-                Share Your Progress
-              </h3>
-              <button
-                onClick={() => setShowShareModal(false)}
-                className={`${t.textMuted} hover:${t.textSecondary}`}
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <p className={`text-sm ${t.textSecondary} mb-4`}>
-              Share this link with friends or parents to show your academic progress!
-            </p>
-            <div className={`p-3 ${t.secondaryBg} rounded-lg break-all text-xs font-mono ${t.textSecondary}`}>
-              {shareUrl.substring(0, 100)}...
-            </div>
-            <button
-              onClick={copyShareUrl}
-              className={`w-full mt-4 ${t.primaryBtn} ${t.primaryBtnText} py-2 px-4 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2`}
-            >
-              <Copy className="w-4 h-4" />
-              Copy Link to Clipboard
-            </button>
-          </div>
-        </div>
       )}
 
       {/* Theme Modal */}
@@ -2375,9 +2617,10 @@ const App = () => {
                 >
                   <div className={`w-8 h-8 rounded-full ${themeData.heroBg}`}></div>
                   <div className="text-left">
-                    <div className="font-medium">{themeData.name}</div>
-                    <div className="text-xs opacity-70">
+                    <div className={`font-medium ${theme === key ? '' : t.textPrimary}`}>{themeData.name}</div>
+                    <div className={`text-xs ${theme === key ? 'opacity-70' : t.textMuted}`}>
                       {key === "feuGreen" && "School colors theme"}
+                      {key === "acesTheme" && "ACES blue color palette"}
                       {key === "dark" && "For late-night study sessions"}
                       {key === "highContrast" && "Accessibility-focused"}
                     </div>
@@ -2416,12 +2659,24 @@ const App = () => {
               onClick={() => setActivePage("gpa")}
               className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full border text-xs md:text-sm transition ${
                 activePage === "gpa"
-                  ? "bg-indigo-600 text-white border-indigo-600"
+                  ? t.navActive
                   : `${t.cardBg} ${t.textSecondary} ${t.cardBorder} hover:opacity-80`
               }`}
             >
               <Calculator className="w-4 h-4" />
               GPA Calculator
+            </button>
+            <button
+              type="button"
+              onClick={() => setActivePage("visualizer")}
+              className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full border text-xs md:text-sm transition ${
+                activePage === "visualizer"
+                  ? t.navActive
+                  : `${t.cardBg} ${t.textSecondary} ${t.cardBorder} hover:opacity-80`
+              }`}
+            >
+              <Link2 className="w-4 h-4" />
+              Chain Visualizer
             </button>
             <button
               type="button"
@@ -2434,7 +2689,7 @@ const App = () => {
         </div>
       </header>
 
-      {activePage === "tracker" ? (
+      {activePage === "tracker" && (
         <CurriculumTrackerPage
           courseStatus={courseStatus}
           setCourseStatus={setCourseStatus}
@@ -2449,13 +2704,13 @@ const App = () => {
           setShowWhatCanITake={setShowWhatCanITake}
           hoveredCourse={hoveredCourse}
           setHoveredCourse={setHoveredCourse}
-          graduationDate={graduationDate}
-          setGraduationDate={setGraduationDate}
+          yearEnteredCollege={yearEnteredCollege}
+          setYearEnteredCollege={setYearEnteredCollege}
           courseGPA={courseGPA}
-          onShareLink={handleShareLink}
           onConfetti={triggerConfetti}
         />
-      ) : (
+      )}
+      {activePage === "gpa" && (
         <GpaCalculatorPage
           courseGPA={courseGPA}
           setCourseGPA={setCourseGPA}
@@ -2464,7 +2719,12 @@ const App = () => {
           successMsg={successMsg}
           setSuccessMsg={setSuccessMsg}
           theme={theme}
-          remainingUnits={remainingUnits}
+        />
+      )}
+      {activePage === "visualizer" && (
+        <ChainVisualizerPage
+          theme={theme}
+          courseStatus={courseStatus}
         />
       )}
     </div>
