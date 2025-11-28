@@ -1916,7 +1916,7 @@ const GpaCalculatorPage = ({ courseGPA, setCourseGPA, errorMsg, setErrorMsg, suc
                     placeholder="Enter units"
                     className={`w-24 px-3 py-1.5 rounded border ${t.cardBorder} ${t.cardBg} ${t.textPrimary} text-sm`}
                   />
-                  <span className={`text-xs ${t.textMuted}`}>(Base on the Curriculum Tracker for the remaining units)</span>
+                  <span className={`text-xs ${t.textMuted}`}>(Based on the Curriculum Tracker for the remaining units)</span>
                 </div>
               </div>
               
@@ -2697,7 +2697,7 @@ const ChainVisualizerPage = ({ theme, courseStatus }) => {
                 <strong>Click</strong> on any course card to view detailed information including prerequisites, co-requisites, and post-requisites. <strong>Hover</strong> to see prerequisite chains. Courses highlighted in <span className="text-yellow-600 font-semibold">yellow</span> are dependent on the hovered course - failing the hovered course will delay these subjects. Courses in <span className="text-orange-600 font-semibold">orange</span> are prerequisites for the hovered course.
               </p>
               <p className={`text-xs ${t.textMuted} mt-2`}>
-                Use <strong>Ctrl/Cmd + Scroll</strong> or the zoom buttons in the bottom-right corner to zoom in/out of the canvas.
+                Use <strong>Ctrl/Cmd + Scroll</strong> or the zoom buttons in the bottom right corner to zoom in/out of the canvas.
               </p>
             </div>
           </div>
