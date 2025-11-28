@@ -2822,6 +2822,13 @@ const MenuLandingPage = ({
       icon: Calendar,
       color: "from-orange-500 to-amber-600",
     },
+    {
+      id: "schedule",
+      title: "Schedule Maker",
+      description: "Build mock enrolments by selecting course sections and checking for schedule conflicts.",
+      icon: Table,
+      color: "from-pink-500 to-rose-600",
+    },
   ];
 
   // What's New content
@@ -2951,18 +2958,18 @@ const MenuLandingPage = ({
             Academic Tools
           </h2>
           
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
             {features.map((feature) => (
               <button
                 key={feature.id}
                 onClick={() => setActivePage(feature.id)}
-                className={`${t.cardBg} rounded-xl p-6 border ${t.cardBorder} ${t.cardHover} hover:shadow-xl transition-all duration-300 text-left group`}
+                className={`${t.cardBg} rounded-xl p-5 border ${t.cardBorder} ${t.cardHover} hover:shadow-xl transition-all duration-300 text-left group`}
               >
-                <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${feature.color} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
-                  <feature.icon className="w-6 h-6 text-white" />
+                <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${feature.color} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
+                  <feature.icon className="w-5 h-5 text-white" />
                 </div>
-                <h3 className={`font-semibold ${t.textPrimary} mb-2`}>{feature.title}</h3>
-                <p className={`text-sm ${t.textSecondary}`}>{feature.description}</p>
+                <h3 className={`font-semibold ${t.textPrimary} mb-1 text-sm`}>{feature.title}</h3>
+                <p className={`text-xs ${t.textSecondary}`}>{feature.description}</p>
               </button>
             ))}
           </div>
@@ -3787,13 +3794,421 @@ END:VEVENT
   );
 };
 
+// ---------------- SCHEDULE MAKER PAGE ----------------
+const ScheduleMakerPage = ({ 
+  theme, 
+  courseStatus,
+  setSuccessMsg,
+  setErrorMsg,
+}) => {
+  const t = THEMES[theme];
+  const [selectedSections, setSelectedSections] = useState([]);
+  const [groupBy, setGroupBy] = useState("course"); // "course" | "department" | "room" | "section"
+  const [searchQuery, setSearchQuery] = useState("");
+  const [viewMode, setViewMode] = useState("table"); // "table" | "card"
+  const [scheduleData, setScheduleData] = useState([]);
+
+  // Mock schedule data - in production, this would come from the student portal
+  const mockSections = useMemo(() => {
+    const sections = [];
+    const days = ["M", "T", "W", "Th", "F", "S"];
+    const times = ["7:00 AM", "8:30 AM", "10:00 AM", "11:30 AM", "1:00 PM", "2:30 PM", "4:00 PM"];
+    const rooms = ["R301", "R302", "R303", "R401", "R402", "LAB1", "LAB2"];
+    
+    CURRICULUM_DATA.forEach(year => {
+      year.terms.forEach(term => {
+        term.courses.forEach(course => {
+          const status = courseStatus[course.id] || "inactive";
+          if (status !== "passed") {
+            // Generate 2-3 mock sections per course
+            const numSections = Math.floor(Math.random() * 2) + 2;
+            for (let i = 0; i < numSections; i++) {
+              const sectionLetter = String.fromCharCode(65 + i);
+              const day1 = days[Math.floor(Math.random() * days.length)];
+              const day2 = days[Math.floor(Math.random() * days.length)];
+              const time = times[Math.floor(Math.random() * times.length)];
+              const room = rooms[Math.floor(Math.random() * rooms.length)];
+              
+              sections.push({
+                id: `${course.id}-${sectionLetter}`,
+                courseId: course.id,
+                courseTitle: course.title,
+                section: sectionLetter,
+                units: course.units,
+                schedule: `${day1}/${day2} ${time}`,
+                room: room,
+                instructor: `Prof. ${String.fromCharCode(65 + Math.floor(Math.random() * 26))}.`,
+                slots: Math.floor(Math.random() * 40) + 5,
+                department: course.id.startsWith("CE") ? "CE" : course.id.startsWith("COE") ? "COE" : "GED",
+              });
+            }
+          }
+        });
+      });
+    });
+    
+    return sections;
+  }, [courseStatus]);
+
+  // Filter sections
+  const filteredSections = useMemo(() => {
+    if (!searchQuery) return mockSections;
+    const query = searchQuery.toLowerCase();
+    return mockSections.filter(s =>
+      s.courseId.toLowerCase().includes(query) ||
+      s.courseTitle.toLowerCase().includes(query) ||
+      s.section.toLowerCase().includes(query) ||
+      s.room.toLowerCase().includes(query) ||
+      s.schedule.toLowerCase().includes(query)
+    );
+  }, [mockSections, searchQuery]);
+
+  // Group sections
+  const groupedSections = useMemo(() => {
+    const groups = {};
+    filteredSections.forEach(section => {
+      let key;
+      switch (groupBy) {
+        case "department":
+          key = section.department;
+          break;
+        case "room":
+          key = section.room;
+          break;
+        case "section":
+          key = section.section;
+          break;
+        default:
+          key = `${section.courseId} – ${section.courseTitle}`;
+      }
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(section);
+    });
+    return groups;
+  }, [filteredSections, groupBy]);
+
+  // Add section to schedule
+  const addToSchedule = (section) => {
+    // Check for conflicts
+    const conflict = selectedSections.find(s => 
+      s.schedule === section.schedule && s.id !== section.id
+    );
+    
+    if (conflict) {
+      setErrorMsg(`Schedule conflict with ${conflict.courseId} Section ${conflict.section}`);
+      setTimeout(() => setErrorMsg(""), 3000);
+      return;
+    }
+    
+    // Check if course already added
+    const existing = selectedSections.find(s => s.courseId === section.courseId);
+    if (existing) {
+      setErrorMsg(`${section.courseId} is already in your schedule`);
+      setTimeout(() => setErrorMsg(""), 3000);
+      return;
+    }
+    
+    setSelectedSections(prev => [...prev, section]);
+    setSuccessMsg(`Added ${section.courseId} Section ${section.section} to schedule`);
+    setTimeout(() => setSuccessMsg(""), 2000);
+  };
+
+  // Remove section from schedule
+  const removeFromSchedule = (sectionId) => {
+    setSelectedSections(prev => prev.filter(s => s.id !== sectionId));
+  };
+
+  // Calculate total units
+  const totalUnits = selectedSections.reduce((acc, s) => acc + s.units, 0);
+
+  // Export schedule as image
+  const exportScheduleImage = () => {
+    setSuccessMsg("Schedule exported! (Use browser screenshot for now)");
+    setTimeout(() => setSuccessMsg(""), 3000);
+  };
+
+  return (
+    <>
+      {/* Hero */}
+      <div className={`${t.heroBg} text-white pb-8 pt-10 px-6 shadow-xl`}>
+        <div className="max-w-6xl mx-auto">
+          <div className="flex items-center gap-3 mb-2">
+            <Table className={`w-8 h-8 ${t.heroAccent}`} />
+            <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
+              Schedule Maker
+            </h1>
+          </div>
+          <p className={`${t.heroText} opacity-90 text-sm md:text-base`}>
+            Build your mock enrolment schedule. Select sections and check for conflicts.
+          </p>
+          <p className={`text-xs ${t.heroText} opacity-70 mt-2`}>
+            Data source: <a href="https://solar.feutech.edu.ph/course/offerings" target="_blank" rel="noopener noreferrer" className="underline">solar.feutech.edu.ph/course/offerings</a>
+          </p>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className={`${t.bodyBg} flex-1`}>
+        <div className="max-w-6xl mx-auto px-4 py-6">
+          {/* Summary Stats */}
+          <div className="grid md:grid-cols-3 gap-4 mb-6">
+            <div className={`${t.cardBg} rounded-xl p-4 border ${t.cardBorder}`}>
+              <div className={`text-xs ${t.textMuted} uppercase tracking-wide`}>Selected Courses</div>
+              <div className={`text-2xl font-bold ${t.textPrimary}`}>{selectedSections.length}</div>
+            </div>
+            <div className={`${t.cardBg} rounded-xl p-4 border ${t.cardBorder}`}>
+              <div className={`text-xs ${t.textMuted} uppercase tracking-wide`}>Total Units</div>
+              <div className={`text-2xl font-bold ${t.textPrimary}`}>{totalUnits}</div>
+              {totalUnits > 21 && (
+                <div className="text-xs text-orange-600 mt-1">⚠️ Over typical limit</div>
+              )}
+            </div>
+            <div className={`${t.cardBg} rounded-xl p-4 border ${t.cardBorder}`}>
+              <div className={`text-xs ${t.textMuted} uppercase tracking-wide`}>Available Sections</div>
+              <div className={`text-2xl font-bold ${t.textPrimary}`}>{filteredSections.length}</div>
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6">
+            {/* Selected Schedule */}
+            <div className={`${t.cardBg} rounded-xl border ${t.cardBorder} p-4`}>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className={`font-semibold ${t.textPrimary} flex items-center gap-2`}>
+                  <Calendar className={`w-4 h-4 ${t.accentText}`} />
+                  My Schedule
+                </h2>
+                <button
+                  onClick={exportScheduleImage}
+                  className={`text-xs ${t.textSecondary} hover:${t.textPrimary} flex items-center gap-1`}
+                >
+                  <Image className="w-3.5 h-3.5" />
+                  Export
+                </button>
+              </div>
+              
+              {selectedSections.length === 0 ? (
+                <div className={`text-sm ${t.textMuted} text-center py-8`}>
+                  No courses selected yet. Browse available sections and add them to your schedule.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {selectedSections.map(section => (
+                    <div key={section.id} className={`p-3 rounded-lg ${t.secondaryBg} border ${t.cardBorder}`}>
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <div className={`text-xs font-mono font-bold ${t.textPrimary}`}>
+                            {section.courseId} – {section.section}
+                          </div>
+                          <div className={`text-[10px] ${t.textSecondary} mt-0.5`}>
+                            {section.courseTitle}
+                          </div>
+                          <div className={`text-[10px] ${t.textMuted} mt-1`}>
+                            {section.schedule} • {section.room}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => removeFromSchedule(section.id)}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Available Sections */}
+            <div className="md:col-span-2">
+              {/* Toolbar */}
+              <div className={`${t.cardBg} rounded-xl border ${t.cardBorder} p-4 mb-4`}>
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  {/* Search */}
+                  <div className="relative flex-1 max-w-xs">
+                    <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${t.textMuted}`} />
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search courses, rooms, times..."
+                      className={`w-full pl-9 pr-4 py-2 rounded-lg text-sm border ${t.cardBorder} ${t.cardBg} ${t.textPrimary}`}
+                    />
+                  </div>
+
+                  {/* Group By */}
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs ${t.textMuted}`}>Group by:</span>
+                    <div className={`flex items-center gap-1 ${t.secondaryBg} rounded-lg p-1`}>
+                      <button
+                        onClick={() => setGroupBy("course")}
+                        className={`px-2 py-1 rounded text-xs transition ${groupBy === "course" ? `${t.primaryBtn} ${t.primaryBtnText}` : `${t.textSecondary}`}`}
+                      >
+                        <Code className="w-3 h-3 inline mr-1" />
+                        Course
+                      </button>
+                      <button
+                        onClick={() => setGroupBy("department")}
+                        className={`px-2 py-1 rounded text-xs transition ${groupBy === "department" ? `${t.primaryBtn} ${t.primaryBtnText}` : `${t.textSecondary}`}`}
+                      >
+                        <Building2 className="w-3 h-3 inline mr-1" />
+                        Dept
+                      </button>
+                      <button
+                        onClick={() => setGroupBy("room")}
+                        className={`px-2 py-1 rounded text-xs transition ${groupBy === "room" ? `${t.primaryBtn} ${t.primaryBtnText}` : `${t.textSecondary}`}`}
+                      >
+                        <MapPin className="w-3 h-3 inline mr-1" />
+                        Room
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* View Mode */}
+                  <div className={`flex items-center gap-1 ${t.secondaryBg} rounded-lg p-1`}>
+                    <button
+                      onClick={() => setViewMode("table")}
+                      className={`px-2 py-1 rounded text-xs transition ${viewMode === "table" ? `${t.primaryBtn} ${t.primaryBtnText}` : `${t.textSecondary}`}`}
+                    >
+                      <Table className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => setViewMode("card")}
+                      className={`px-2 py-1 rounded text-xs transition ${viewMode === "card" ? `${t.primaryBtn} ${t.primaryBtnText}` : `${t.textSecondary}`}`}
+                    >
+                      <LayoutGrid className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Filter Summary */}
+                <div className={`text-xs ${t.textMuted} mt-3`}>
+                  Showing {filteredSections.length} section{filteredSections.length !== 1 ? 's' : ''} 
+                  in {Object.keys(groupedSections).length} group{Object.keys(groupedSections).length !== 1 ? 's' : ''}
+                </div>
+              </div>
+
+              {/* Sections List */}
+              <div className={`${t.cardBg} rounded-xl border ${t.cardBorder} overflow-hidden`}>
+                {Object.entries(groupedSections).map(([groupName, sections]) => (
+                  <div key={groupName} className={`border-b ${t.cardBorder} last:border-b-0`}>
+                    <div className={`px-4 py-2 ${t.secondaryBg} font-semibold text-sm ${t.textPrimary}`}>
+                      {groupName}
+                    </div>
+                    
+                    {viewMode === "table" ? (
+                      <table className="w-full text-xs">
+                        <thead className={`${t.secondaryBg}`}>
+                          <tr>
+                            <th className="px-4 py-2 text-left font-medium">Section</th>
+                            <th className="px-4 py-2 text-left font-medium">Schedule</th>
+                            <th className="px-4 py-2 text-left font-medium">Room</th>
+                            <th className="px-4 py-2 text-center font-medium">Units</th>
+                            <th className="px-4 py-2 text-center font-medium">Slots</th>
+                            <th className="px-4 py-2 text-center font-medium">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {sections.map(section => {
+                            const isSelected = selectedSections.some(s => s.id === section.id);
+                            const hasConflict = selectedSections.some(s => 
+                              s.schedule === section.schedule && s.id !== section.id
+                            );
+                            
+                            return (
+                              <tr key={section.id} className={`border-t ${t.cardBorder} ${isSelected ? t.passedBg : ''}`}>
+                                <td className={`px-4 py-2 font-mono ${t.textPrimary}`}>
+                                  {section.courseId}-{section.section}
+                                </td>
+                                <td className={`px-4 py-2 ${t.textSecondary}`}>{section.schedule}</td>
+                                <td className={`px-4 py-2 ${t.textSecondary}`}>{section.room}</td>
+                                <td className={`px-4 py-2 text-center ${t.textSecondary}`}>{section.units}</td>
+                                <td className={`px-4 py-2 text-center ${t.textSecondary}`}>{section.slots}</td>
+                                <td className="px-4 py-2 text-center">
+                                  {isSelected ? (
+                                    <button
+                                      onClick={() => removeFromSchedule(section.id)}
+                                      className="text-red-500 text-xs"
+                                    >
+                                      Remove
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={() => addToSchedule(section)}
+                                      className={`text-xs ${hasConflict ? 'text-orange-500' : t.accentText}`}
+                                    >
+                                      {hasConflict ? '⚠️ Add' : 'Add'}
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <div className="p-4 grid md:grid-cols-2 gap-3">
+                        {sections.map(section => {
+                          const isSelected = selectedSections.some(s => s.id === section.id);
+                          
+                          return (
+                            <div
+                              key={section.id}
+                              className={`p-3 rounded-lg border ${isSelected ? `${t.passedBg} ${t.passedBorder}` : `${t.secondaryBg} ${t.cardBorder}`}`}
+                            >
+                              <div className="flex items-start justify-between">
+                                <div>
+                                  <div className={`text-xs font-mono font-bold ${t.textPrimary}`}>
+                                    {section.courseId}-{section.section}
+                                  </div>
+                                  <div className={`text-[10px] ${t.textSecondary}`}>{section.schedule}</div>
+                                  <div className={`text-[10px] ${t.textMuted}`}>{section.room} • {section.units}u • {section.slots} slots</div>
+                                </div>
+                                {isSelected ? (
+                                  <button
+                                    onClick={() => removeFromSchedule(section.id)}
+                                    className="text-red-500"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => addToSchedule(section)}
+                                    className={`${t.primaryBtn} ${t.primaryBtnText} text-xs px-2 py-1 rounded`}
+                                  >
+                                    Add
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ))}
+                
+                {Object.keys(groupedSections).length === 0 && (
+                  <div className={`p-8 text-center ${t.textMuted}`}>
+                    No sections found matching your search.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+};
+
 // ---------------- ROOT APP WITH PAGE SWITCHER ----------------
 const App = () => {
   const [courseStatus, setCourseStatus] = useState({});
   const [courseGPA, setCourseGPA] = useState({});
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
-  const [activePage, setActivePage] = useState("home"); // "home" | "tracker" | "gpa" | "visualizer" | "planner"
+  const [activePage, setActivePage] = useState("home"); // "home" | "tracker" | "gpa" | "visualizer" | "planner" | "schedule"
   const [theme, setTheme] = useState("feuGreen"); // "feuGreen" | "acesTheme" | "dark" | "highContrast"
   const [viewMode, setViewMode] = useState("card"); // "card" | "list"
   const [showWhatCanITake, setShowWhatCanITake] = useState(false);
@@ -4024,6 +4439,18 @@ const App = () => {
             </button>
             <button
               type="button"
+              onClick={() => setActivePage("schedule")}
+              className={`inline-flex items-center gap-1 px-2 md:px-3 py-1.5 rounded-full border text-xs md:text-sm transition ${
+                activePage === "schedule"
+                  ? t.navActive
+                  : `${t.cardBg} ${t.textSecondary} ${t.cardBorder} hover:opacity-80`
+              }`}
+            >
+              <Table className="w-4 h-4" />
+              <span className="hidden md:inline">Schedule</span>
+            </button>
+            <button
+              type="button"
               onClick={() => setShowThemeModal(true)}
               className={`inline-flex items-center gap-1 px-2 md:px-3 py-1.5 rounded-full border text-xs md:text-sm transition ${t.cardBg} ${t.textSecondary} ${t.cardBorder} hover:opacity-80`}
             >
@@ -4103,6 +4530,14 @@ const App = () => {
           setSuccessMsg={setSuccessMsg}
           setErrorMsg={setErrorMsg}
           onConfetti={triggerConfetti}
+        />
+      )}
+      {activePage === "schedule" && (
+        <ScheduleMakerPage
+          theme={theme}
+          courseStatus={courseStatus}
+          setSuccessMsg={setSuccessMsg}
+          setErrorMsg={setErrorMsg}
         />
       )}
     </div>
