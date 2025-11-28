@@ -23,6 +23,8 @@ import {
   Target,
   AlertTriangle,
   Link2,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/react";
@@ -943,13 +945,6 @@ const CurriculumTrackerPage = ({
             <p className={`${t.heroText} opacity-90 text-sm md:text-base`}>
               Civil Engineering • BSCE Curriculum (FEU Institute of Technology)
             </p>
-            {/* Graduation Countdown */}
-            {termsRemaining !== null && (
-              <div className={`mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full ${t.accentBg} ${t.accentText} text-sm font-medium`}>
-                <Calendar className="w-4 h-4" />
-                {termsRemaining === 0 ? "🎓 Graduation Time!" : `${termsRemaining} Term${termsRemaining !== 1 ? 's' : ''} to go!`}
-              </div>
-            )}
           </div>
 
           {/* Summary stats */}
@@ -1116,22 +1111,6 @@ const CurriculumTrackerPage = ({
               </button>
             </div>
 
-            <div className="flex items-center gap-2">
-              {/* Year Entered College Input */}
-              <div className="flex items-center gap-1.5">
-                <Calendar className={`w-3.5 h-3.5 ${t.textMuted}`} />
-                <label className={`text-xs ${t.textSecondary}`}>Year Entered College:</label>
-                <input
-                  type="number"
-                  min="2000"
-                  max="2100"
-                  value={yearEnteredCollege}
-                  onChange={(e) => setYearEnteredCollege(e.target.value)}
-                  className={`w-20 px-2 py-1 rounded border ${t.cardBorder} ${t.cardBg} ${t.textPrimary} text-xs`}
-                  placeholder="e.g. 2022"
-                />
-              </div>
-            </div>
           </div>
 
           {/* PROGRESS BAR */}
@@ -1937,7 +1916,7 @@ const GpaCalculatorPage = ({ courseGPA, setCourseGPA, errorMsg, setErrorMsg, suc
                     placeholder="Enter units"
                     className={`w-24 px-3 py-1.5 rounded border ${t.cardBorder} ${t.cardBg} ${t.textPrimary} text-sm`}
                   />
-                  <span className={`text-xs ${t.textMuted}`}>(independent from tracker)</span>
+                  <span className={`text-xs ${t.textMuted}`}>(Base on the Curriculum Tracker for the remaining units)</span>
                 </div>
               </div>
               
@@ -2260,7 +2239,15 @@ const GpaCalculatorPage = ({ courseGPA, setCourseGPA, errorMsg, setErrorMsg, suc
 // ---------------- CHAIN VISUALIZER PAGE ----------------
 const ChainVisualizerPage = ({ theme, courseStatus }) => {
   const [hoveredCourse, setHoveredCourse] = useState(null);
+  const [selectedCourse, setSelectedCourse] = useState(null);
+  const [zoom, setZoom] = useState(1);
+  const canvasRef = useRef(null);
   const t = THEMES[theme];
+
+  // Zoom constraints
+  const MIN_ZOOM = 0.5;
+  const MAX_ZOOM = 2;
+  const ZOOM_STEP = 0.1;
 
   // Get all courses with their positions
   const allCourses = useMemo(() => {
@@ -2280,6 +2267,50 @@ const ChainVisualizerPage = ({ theme, courseStatus }) => {
     });
     return courses;
   }, []);
+
+  // Helper to get course by id
+  const getCourseById = useCallback((courseId) => {
+    return allCourses.find(c => c.id === courseId);
+  }, [allCourses]);
+
+  // Helper to get co-requisite (lab's lecture or lecture's lab)
+  const getCorequisite = useCallback((course) => {
+    if (!course) return null;
+    
+    // If this is a lab course, find its lecture
+    if (course.id.endsWith('L')) {
+      const lectureId = course.id.slice(0, -1);
+      const lecture = getCourseById(lectureId);
+      if (lecture) {
+        return { id: lecture.id, title: lecture.title, type: 'lecture' };
+      }
+    }
+    
+    // If this is a lecture course, find its lab
+    const labId = course.id + 'L';
+    const lab = getCourseById(labId);
+    if (lab) {
+      return { id: lab.id, title: lab.title, type: 'laboratory' };
+    }
+    
+    return null;
+  }, [getCourseById]);
+
+  // Helper to get post-requisites (courses in the next term only that depend on this course)
+  const getPostRequisites = useCallback((course) => {
+    if (!course) return [];
+    
+    const currentTermNumber = course.yearIndex * 3 + course.termIndex;
+    const nextTermNumber = currentTermNumber + 1;
+    
+    // Get all courses in the next term that have this course as a prerequisite
+    const postReqs = allCourses.filter(c => {
+      const cTermNumber = c.yearIndex * 3 + c.termIndex;
+      return cTermNumber === nextTermNumber && c.prereqs.includes(course.id);
+    });
+    
+    return postReqs.map(c => ({ id: c.id, title: c.title }));
+  }, [allCourses]);
 
   // Get highlighted courses (dependents of hovered course)
   const highlightedCourses = useMemo(() => {
@@ -2314,6 +2345,58 @@ const ChainVisualizerPage = ({ theme, courseStatus }) => {
 
   const totalColumns = 12; // 4 years * 3 terms
 
+  // Zoom handlers
+  const handleZoomIn = useCallback(() => {
+    setZoom(prev => Math.min(prev + ZOOM_STEP, MAX_ZOOM));
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    setZoom(prev => Math.max(prev - ZOOM_STEP, MIN_ZOOM));
+  }, []);
+
+  const handleResetZoom = useCallback(() => {
+    setZoom(1);
+  }, []);
+
+  // Handle scroll wheel zoom
+  const handleWheel = useCallback((e) => {
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP;
+      setZoom(prev => Math.min(Math.max(prev + delta, MIN_ZOOM), MAX_ZOOM));
+    }
+  }, []);
+
+  // Handle course card click
+  const handleCourseClick = useCallback((course) => {
+    setSelectedCourse(course);
+  }, []);
+
+  // Close modal
+  const handleCloseModal = useCallback(() => {
+    setSelectedCourse(null);
+  }, []);
+
+  // Get selected course details
+  const selectedCourseDetails = useMemo(() => {
+    if (!selectedCourse) return null;
+    
+    const prereqDetails = selectedCourse.prereqs.map(prereqId => {
+      const prereq = getCourseById(prereqId);
+      return prereq ? { id: prereq.id, title: prereq.title } : { id: prereqId, title: 'Unknown Course' };
+    });
+    
+    const coreq = getCorequisite(selectedCourse);
+    const postReqs = getPostRequisites(selectedCourse);
+    
+    return {
+      ...selectedCourse,
+      prereqDetails,
+      corequisite: coreq,
+      postRequisites: postReqs,
+    };
+  }, [selectedCourse, getCourseById, getCorequisite, getPostRequisites]);
+
   return (
     <>
       <div className={`${t.heroBg} text-white pb-6 pt-10 px-6 shadow-xl`}>
@@ -2325,9 +2408,9 @@ const ChainVisualizerPage = ({ theme, courseStatus }) => {
             </h1>
           </div>
           <p className={`${t.heroText} opacity-90 text-sm md:text-base`}>
-            Hover over a course to see its prerequisite chain and all dependent courses.
+            Hover over a course to see its prerequisite chain. Click on a course card to view detailed information.
           </p>
-          <div className={`mt-3 flex gap-4 text-xs ${t.heroText}`}>
+          <div className={`mt-3 flex flex-wrap gap-4 text-xs ${t.heroText}`}>
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 rounded bg-blue-500"></div>
               <span>Hovered Course</span>
@@ -2340,23 +2423,166 @@ const ChainVisualizerPage = ({ theme, courseStatus }) => {
               <div className="w-4 h-4 rounded bg-yellow-400"></div>
               <span>Dependent Courses (at risk if failed)</span>
             </div>
+            <div className="flex items-center gap-2 ml-auto">
+              <span className="opacity-70">Ctrl/Cmd + Scroll to zoom</span>
+            </div>
           </div>
         </div>
       </div>
 
+      {/* Course Details Modal */}
+      {selectedCourse && selectedCourseDetails && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className={`${t.cardBg} rounded-xl shadow-2xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto`}>
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <span className={`text-xs font-mono font-bold px-2 py-1 rounded ${t.accentBg} ${t.accentText}`}>
+                  {selectedCourseDetails.id}
+                </span>
+              </div>
+              <button
+                onClick={handleCloseModal}
+                className={`${t.textMuted} hover:${t.textSecondary} p-1`}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <h2 className={`text-xl font-bold ${t.textPrimary} mb-4`}>
+              {selectedCourseDetails.title}
+            </h2>
+
+            <div className="space-y-4">
+              {/* Course Code */}
+              <div className={`p-3 rounded-lg ${t.secondaryBg} border ${t.cardBorder}`}>
+                <div className={`text-xs font-semibold ${t.textMuted} uppercase tracking-wide mb-1`}>
+                  Course Code
+                </div>
+                <div className={`text-sm ${t.textPrimary} font-mono`}>
+                  {selectedCourseDetails.id}
+                </div>
+              </div>
+
+              {/* Course Title */}
+              <div className={`p-3 rounded-lg ${t.secondaryBg} border ${t.cardBorder}`}>
+                <div className={`text-xs font-semibold ${t.textMuted} uppercase tracking-wide mb-1`}>
+                  Course Title
+                </div>
+                <div className={`text-sm ${t.textPrimary}`}>
+                  {selectedCourseDetails.title}
+                </div>
+              </div>
+
+              {/* Units */}
+              <div className={`p-3 rounded-lg ${t.secondaryBg} border ${t.cardBorder}`}>
+                <div className={`text-xs font-semibold ${t.textMuted} uppercase tracking-wide mb-1`}>
+                  Units
+                </div>
+                <div className={`text-sm ${t.textPrimary}`}>
+                  {selectedCourseDetails.units} Unit{selectedCourseDetails.units !== 1 ? 's' : ''}
+                </div>
+              </div>
+
+              {/* Pre-requisite */}
+              <div className={`p-3 rounded-lg ${t.secondaryBg} border ${t.cardBorder}`}>
+                <div className={`text-xs font-semibold ${t.textMuted} uppercase tracking-wide mb-1`}>
+                  Pre-requisite
+                </div>
+                <div className={`text-sm ${t.textPrimary}`}>
+                  {selectedCourseDetails.prereqDetails.length > 0 ? (
+                    <div className="space-y-1">
+                      {selectedCourseDetails.prereqDetails.map((prereq, idx) => (
+                        <div key={idx} className="flex items-center gap-2">
+                          <span className={`font-mono text-xs ${t.accentText}`}>{prereq.id}</span>
+                          <span className={t.textSecondary}>-</span>
+                          <span>{prereq.title}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className={t.textMuted}>None</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Co-requisite */}
+              <div className={`p-3 rounded-lg ${t.secondaryBg} border ${t.cardBorder}`}>
+                <div className={`text-xs font-semibold ${t.textMuted} uppercase tracking-wide mb-1`}>
+                  Co-requisite
+                </div>
+                <div className={`text-sm ${t.textPrimary}`}>
+                  {selectedCourseDetails.corequisite ? (
+                    <div className="flex items-center gap-2">
+                      <span className={`font-mono text-xs ${t.accentText}`}>{selectedCourseDetails.corequisite.id}</span>
+                      <span className={t.textSecondary}>-</span>
+                      <span>{selectedCourseDetails.corequisite.title}</span>
+                    </div>
+                  ) : (
+                    <span className={t.textMuted}>None</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Post-requisite (Next Term Only) */}
+              <div className={`p-3 rounded-lg ${t.secondaryBg} border ${t.cardBorder}`}>
+                <div className={`text-xs font-semibold ${t.textMuted} uppercase tracking-wide mb-1`}>
+                  Post-requisite (Next Term)
+                </div>
+                <div className={`text-sm ${t.textPrimary}`}>
+                  {selectedCourseDetails.postRequisites.length > 0 ? (
+                    <div className="space-y-1">
+                      {selectedCourseDetails.postRequisites.map((postReq, idx) => (
+                        <div key={idx} className="flex items-center gap-2">
+                          <span className={`font-mono text-xs ${t.accentText}`}>{postReq.id}</span>
+                          <span className={t.textSecondary}>-</span>
+                          <span>{postReq.title}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className={t.textMuted}>None</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Term Info */}
+              <div className={`p-3 rounded-lg ${t.accentBg} border ${t.accentBorder}`}>
+                <div className={`text-xs font-semibold ${t.accentText} uppercase tracking-wide mb-1`}>
+                  Schedule
+                </div>
+                <div className={`text-sm ${t.textPrimary}`}>
+                  {selectedCourseDetails.yearName} • {selectedCourseDetails.termName}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Whiteboard-like visualization area */}
-      <div className="flex-1 w-full overflow-x-auto">
+      <div 
+        ref={canvasRef}
+        className="flex-1 w-full overflow-auto relative"
+        onWheel={handleWheel}
+      >
         <div 
-          className={`min-h-screen p-6 ${t.bodyBg}`}
+          className={`p-6 ${t.bodyBg}`}
           style={{
             backgroundImage: `
               linear-gradient(to right, ${theme === 'dark' || theme === 'highContrast' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)'} 1px, transparent 1px),
               linear-gradient(to bottom, ${theme === 'dark' || theme === 'highContrast' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)'} 1px, transparent 1px)
             `,
-            backgroundSize: '20px 20px',
+            backgroundSize: `${20 * zoom}px ${20 * zoom}px`,
+            minHeight: 'calc(100vh - 200px)',
           }}
         >
-          <div className="max-w-7xl mx-auto">
+          <div 
+            className="mx-auto transition-transform duration-200 origin-top-left"
+            style={{ 
+              transform: `scale(${zoom})`,
+              width: `${100 / zoom}%`,
+            }}
+          >
             {/* Column Headers */}
             <div 
               className="grid gap-2 mb-4" 
@@ -2424,6 +2650,7 @@ const ChainVisualizerPage = ({ theme, courseStatus }) => {
                           key={course.id}
                           onMouseEnter={() => setHoveredCourse(course.id)}
                           onMouseLeave={() => setHoveredCourse(null)}
+                          onClick={() => handleCourseClick(course)}
                           className={`p-2 rounded-lg border ${bgColor} ${borderColor} ${ringStyle} transition-all duration-200 cursor-pointer hover:shadow-lg ${
                             isAutoLab ? 'opacity-60' : ''
                           }`}
@@ -2467,13 +2694,43 @@ const ChainVisualizerPage = ({ theme, courseStatus }) => {
             <div className={`mt-8 p-4 ${t.cardBg} rounded-lg border ${t.cardBorder}`}>
               <h3 className={`text-sm font-semibold ${t.textPrimary} mb-2`}>How to Use</h3>
               <p className={`text-xs ${t.textSecondary}`}>
-                Hover over any course to visualize its prerequisite chain. Courses highlighted in <span className="text-yellow-600 font-semibold">yellow</span> are dependent on the hovered course - failing the hovered course will delay these subjects. Courses in <span className="text-orange-600 font-semibold">orange</span> are prerequisites for the hovered course.
+                <strong>Click</strong> on any course card to view detailed information including prerequisites, co-requisites, and post-requisites. <strong>Hover</strong> to see prerequisite chains. Courses highlighted in <span className="text-yellow-600 font-semibold">yellow</span> are dependent on the hovered course - failing the hovered course will delay these subjects. Courses in <span className="text-orange-600 font-semibold">orange</span> are prerequisites for the hovered course.
               </p>
               <p className={`text-xs ${t.textMuted} mt-2`}>
-                This visualization helps you understand the consequences of failing a course and plan your academic path accordingly.
+                Use <strong>Ctrl/Cmd + Scroll</strong> or the zoom buttons in the bottom-right corner to zoom in/out of the canvas.
               </p>
             </div>
           </div>
+        </div>
+
+        {/* Zoom Controls - Fixed at bottom right */}
+        <div className={`fixed bottom-6 right-6 flex flex-col gap-2 ${t.cardBg} p-2 rounded-lg shadow-lg border ${t.cardBorder} z-40`}>
+          <button
+            onClick={handleZoomIn}
+            disabled={zoom >= MAX_ZOOM}
+            className={`p-2 rounded-lg ${t.secondaryBg} ${t.textPrimary} hover:opacity-80 transition disabled:opacity-40 disabled:cursor-not-allowed`}
+            title="Zoom In"
+          >
+            <ZoomIn className="w-5 h-5" />
+          </button>
+          <div className={`text-xs text-center ${t.textMuted} font-mono`}>
+            {Math.round(zoom * 100)}%
+          </div>
+          <button
+            onClick={handleZoomOut}
+            disabled={zoom <= MIN_ZOOM}
+            className={`p-2 rounded-lg ${t.secondaryBg} ${t.textPrimary} hover:opacity-80 transition disabled:opacity-40 disabled:cursor-not-allowed`}
+            title="Zoom Out"
+          >
+            <ZoomOut className="w-5 h-5" />
+          </button>
+          <button
+            onClick={handleResetZoom}
+            className={`p-2 rounded-lg ${t.secondaryBg} ${t.textMuted} hover:${t.textPrimary} transition text-xs`}
+            title="Reset Zoom"
+          >
+            <RotateCcw className="w-4 h-4" />
+          </button>
         </div>
       </div>
     </>
