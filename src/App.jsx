@@ -2223,6 +2223,17 @@ const ChainVisualizerPage = ({ theme, courseStatus }) => {
     }
   }, []);
 
+  // Attach wheel event listener with passive: false to allow preventDefault
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    canvas.addEventListener('wheel', handleWheel, { passive: false });
+    return () => {
+      canvas.removeEventListener('wheel', handleWheel);
+    };
+  }, [handleWheel]);
+
   // Zoom controls
   const handleZoomIn = () => {
     setZoom((prev) => Math.min(MAX_ZOOM, prev + ZOOM_STEP));
@@ -2487,15 +2498,14 @@ const ChainVisualizerPage = ({ theme, courseStatus }) => {
       <div 
         ref={canvasRef}
         className="flex-1 w-full overflow-auto relative"
-        onWheel={handleWheel}
       >
         <div 
-          className={`min-h-screen p-6 ${t.bodyBg} origin-top-left transition-transform duration-200`}
+          className={`min-h-screen p-6 ${t.bodyBg} transition-transform duration-200`}
           style={{
             transform: `scale(${zoom})`,
-            transformOrigin: 'top left',
+            transformOrigin: 'top center',
             width: `${100 / zoom}%`,
-            minWidth: `${1440 / zoom}px`,
+            minWidth: '1200px',
             backgroundImage: `
               linear-gradient(to right, ${theme === 'dark' || theme === 'highContrast' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)'} 1px, transparent 1px),
               linear-gradient(to bottom, ${theme === 'dark' || theme === 'highContrast' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)'} 1px, transparent 1px)
@@ -2503,11 +2513,11 @@ const ChainVisualizerPage = ({ theme, courseStatus }) => {
             backgroundSize: '20px 20px',
           }}
         >
-          <div className="max-w-7xl mx-auto">
+          <div className="w-full px-4">
             {/* Column Headers */}
             <div 
               className="grid gap-2 mb-4" 
-              style={{ gridTemplateColumns: `repeat(${totalColumns}, minmax(120px, 1fr))` }}
+              style={{ gridTemplateColumns: `repeat(${totalColumns}, minmax(100px, 1fr))` }}
             >
               {Array.from({ length: totalColumns }, (_, i) => {
                 const yearIdx = Math.floor(i / 3);
@@ -2532,7 +2542,7 @@ const ChainVisualizerPage = ({ theme, courseStatus }) => {
             {/* Course Grid */}
             <div 
               className="grid gap-2" 
-              style={{ gridTemplateColumns: `repeat(${totalColumns}, minmax(120px, 1fr))` }}
+              style={{ gridTemplateColumns: `repeat(${totalColumns}, minmax(100px, 1fr))` }}
             >
               {Array.from({ length: totalColumns }, (_, colIdx) => {
                 const courses = coursesByColumn[colIdx] || [];
@@ -2592,11 +2602,6 @@ const ChainVisualizerPage = ({ theme, courseStatus }) => {
                             isHovered || isHighlighted || isPrereq ? 'text-slate-600' : t.textMuted
                           }`}>
                             {course.units} units
-                            {course.prereqs.length > 0 && (
-                              <span className="ml-1">
-                                • {course.prereqs.length} prereq{course.prereqs.length > 1 ? 's' : ''}
-                              </span>
-                            )}
                           </div>
                           {status === "passed" && (
                             <div className={`text-[8px] mt-1 ${t.passedBadge} px-1 py-0.5 rounded inline-block`}>
@@ -2669,6 +2674,7 @@ const App = () => {
   const [yearEnteredCollege, setYearEnteredCollege] = useState("");
   const [showConfetti, setShowConfetti] = useState(false);
   const [confettiSize, setConfettiSize] = useState("small");
+  const [confettiRunning, setConfettiRunning] = useState(true);
   const [showThemeModal, setShowThemeModal] = useState(false);
   
   const t = THEMES[theme];
@@ -2740,8 +2746,16 @@ const App = () => {
   // Handle confetti
   const triggerConfetti = useCallback((size) => {
     setConfettiSize(size);
+    setConfettiRunning(true);
     setShowConfetti(true);
-    setTimeout(() => setShowConfetti(false), size === "big" ? 5000 : 2000);
+    // Stop producing new confetti after the display time, but keep showing until complete
+    setTimeout(() => setConfettiRunning(false), size === "big" ? 5000 : 2000);
+  }, []);
+
+  // Called when all confetti pieces have left the screen
+  const handleConfettiComplete = useCallback(() => {
+    setShowConfetti(false);
+    setConfettiRunning(true); // Reset for next trigger
   }, []);
 
   return (
@@ -2754,9 +2768,10 @@ const App = () => {
         <Confetti
           width={window.innerWidth}
           height={window.innerHeight}
-          recycle={false}
-          numberOfPieces={confettiSize === "big" ? 500 : 100}
+          recycle={confettiRunning}
+          numberOfPieces={confettiRunning ? (confettiSize === "big" ? 500 : 100) : 0}
           gravity={confettiSize === "big" ? 0.3 : 0.5}
+          onConfettiComplete={handleConfettiComplete}
         />
       )}
 
