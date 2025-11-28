@@ -268,6 +268,25 @@ const isAutoSyncedLabId = (courseId) => {
 const getCoreqLectureId = (courseId) =>
   courseId.endsWith("L") ? courseId.slice(0, -1) : null;
 
+// Petition-required courses - courses that typically require petition for out-of-sequence taking
+// These include internship, projects, and specialized courses with multiple prerequisites
+const PETITION_REQUIRED_COURSES = new Set([
+  "CE0067", // Internship for CE
+  "CE0057", // CE Project 1
+  "CE0071", // CE Project 2
+  "CE0043", // Professional Course 1 – Earthquake Engineering
+  "CE0045", // Professional Course 2 – Reinforced Concrete Design
+  "CE0059", // Professional Course 3 – Design of Steel Structures
+  "CE0061", // Professional Course 4 – Prestressed Concrete Design
+  "CE0073", // Professional Course 5 – Foundation and Retaining Wall
+  "CE0075", // Professional Course 6 – Computer Software in Structural Analysis
+  "CE0077", // Technical Elective for CE - COSH
+  "CE0069", // CE Correlation Course 3
+]);
+
+// Check if a course requires petition for out-of-sequence enrollment
+const isPetitionRequired = (courseId) => PETITION_REQUIRED_COURSES.has(courseId);
+
 const isLabCourse = (course) => course.id.endsWith("L");
 
 // Theme configurations
@@ -1250,7 +1269,12 @@ const CurriculumTrackerPage = ({
                                     onMouseEnter={() => setHoveredCourse(course.id)}
                                     onMouseLeave={() => setHoveredCourse(null)}
                                   >
-                                    <td className="py-2 px-2 font-mono">{course.id}</td>
+                                    <td className="py-2 px-2 font-mono">
+                                      {course.id}
+                                      {isPetitionRequired(course.id) && (
+                                        <span className="ml-1 text-[8px] bg-amber-500 text-white px-1 rounded" title="Petition may be required">P</span>
+                                      )}
+                                    </td>
                                     <td className="py-2 px-2">{course.title}</td>
                                     <td className="py-2 px-2 text-center">{course.units}</td>
                                     <td className="py-2 px-2 text-center">{term.termName}</td>
@@ -1397,6 +1421,11 @@ const CurriculumTrackerPage = ({
                                       {lab && (
                                         <span className="text-[9px] uppercase tracking-wide bg-slate-800 text-slate-50 px-1.5 py-0.5 rounded-full">
                                           Laboratory
+                                        </span>
+                                      )}
+                                      {isPetitionRequired(course.id) && (
+                                        <span className="text-[9px] uppercase tracking-wide bg-amber-500 text-white px-1.5 py-0.5 rounded-full" title="Petition may be required">
+                                          Petition
                                         </span>
                                       )}
                                     </div>
@@ -3889,7 +3918,7 @@ const ScheduleMakerPage = ({
 
   // Add section to schedule
   const addToSchedule = (section) => {
-    // Check for conflicts
+    // Check for time conflicts
     const conflict = selectedSections.find(s => 
       s.schedule === section.schedule && s.id !== section.id
     );
@@ -3907,6 +3936,23 @@ const ScheduleMakerPage = ({
       setTimeout(() => setErrorMsg(""), 3000);
       return;
     }
+
+    // Check credit limit warning
+    const newTotalUnits = totalUnits + section.units;
+    if (newTotalUnits > 21) {
+      setErrorMsg(`Warning: Adding this course will put you at ${newTotalUnits} units (over typical 21 unit limit)`);
+      setTimeout(() => setErrorMsg(""), 4000);
+    }
+
+    // Check prerequisite status
+    const courseData = CURRICULUM_DATA.flatMap(y => y.terms.flatMap(t => t.courses)).find(c => c.id === section.courseId);
+    if (courseData && courseData.prereqs.length > 0) {
+      const unmetPrereqs = courseData.prereqs.filter(prereqId => courseStatus[prereqId] !== "passed");
+      if (unmetPrereqs.length > 0) {
+        setErrorMsg(`Warning: Prerequisites not met: ${unmetPrereqs.join(", ")}`);
+        setTimeout(() => setErrorMsg(""), 4000);
+      }
+    }
     
     setSelectedSections(prev => [...prev, section]);
     setSuccessMsg(`Added ${section.courseId} Section ${section.section} to schedule`);
@@ -3920,6 +3966,43 @@ const ScheduleMakerPage = ({
 
   // Calculate total units
   const totalUnits = selectedSections.reduce((acc, s) => acc + s.units, 0);
+
+  // Check for warnings
+  const getScheduleWarnings = () => {
+    const warnings = [];
+    
+    if (totalUnits > 21) {
+      warnings.push({ type: "credit", message: `Credit limit exceeded: ${totalUnits} units (typical max: 21)` });
+    }
+    
+    // Check for prerequisite issues
+    selectedSections.forEach(section => {
+      const courseData = CURRICULUM_DATA.flatMap(y => y.terms.flatMap(t => t.courses)).find(c => c.id === section.courseId);
+      if (courseData && courseData.prereqs.length > 0) {
+        const unmetPrereqs = courseData.prereqs.filter(prereqId => courseStatus[prereqId] !== "passed");
+        if (unmetPrereqs.length > 0) {
+          warnings.push({ 
+            type: "prereq", 
+            message: `${section.courseId}: Missing prerequisites (${unmetPrereqs.join(", ")})` 
+          });
+        }
+      }
+    });
+
+    // Check for petition-required courses
+    selectedSections.forEach(section => {
+      if (isPetitionRequired(section.courseId)) {
+        warnings.push({
+          type: "petition",
+          message: `${section.courseId}: May require petition for enrollment`
+        });
+      }
+    });
+    
+    return warnings;
+  };
+
+  const scheduleWarnings = getScheduleWarnings();
 
   // Export schedule as image
   const exportScheduleImage = () => {
@@ -3950,6 +4033,31 @@ const ScheduleMakerPage = ({
       {/* Main Content */}
       <div className={`${t.bodyBg} flex-1`}>
         <div className="max-w-6xl mx-auto px-4 py-6">
+          {/* Warnings Panel */}
+          {scheduleWarnings.length > 0 && (
+            <div className={`mb-6 ${t.cardBg} rounded-xl border border-orange-300 p-4`}>
+              <div className="flex items-center gap-2 mb-3">
+                <AlertTriangle className="w-5 h-5 text-orange-500" />
+                <h3 className={`font-semibold ${t.textPrimary}`}>Schedule Warnings</h3>
+              </div>
+              <div className="space-y-2">
+                {scheduleWarnings.map((warning, idx) => (
+                  <div key={idx} className="flex items-start gap-2 text-sm">
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${
+                      warning.type === "credit" ? "bg-red-100 text-red-700" :
+                      warning.type === "prereq" ? "bg-orange-100 text-orange-700" :
+                      "bg-amber-100 text-amber-700"
+                    }`}>
+                      {warning.type === "credit" ? "Credit" : 
+                       warning.type === "prereq" ? "Prereq" : "Petition"}
+                    </span>
+                    <span className={t.textSecondary}>{warning.message}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Summary Stats */}
           <div className="grid md:grid-cols-3 gap-4 mb-6">
             <div className={`${t.cardBg} rounded-xl p-4 border ${t.cardBorder}`}>
