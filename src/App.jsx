@@ -52,6 +52,9 @@ import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 import Confetti from "react-confetti";
 
+// Configuration constants
+const STUDENT_PORTAL_URL = "https://solar.feutech.edu.ph/course/offerings";
+
 // --- DATA: Full Civil Engineering Curriculum (FEU Tech BSCE) ---
 const CURRICULUM_DATA = [
   {
@@ -1272,7 +1275,7 @@ const CurriculumTrackerPage = ({
                                     <td className="py-2 px-2 font-mono">
                                       {course.id}
                                       {isPetitionRequired(course.id) && (
-                                        <span className="ml-1 text-[8px] bg-amber-500 text-white px-1 rounded" title="Petition may be required">P</span>
+                                        <span className="ml-1 text-[10px] bg-amber-500 text-white px-1 rounded" title="Petition may be required">P</span>
                                       )}
                                     </td>
                                     <td className="py-2 px-2">{course.title}</td>
@@ -2811,7 +2814,6 @@ const MenuLandingPage = ({
     const termInYear = (lastIncompleteTermIndex % 3) + 1;
     const graduationYear = entryYear + yearsFromStart + (termInYear === 3 ? 1 : 0);
     const termNames = ["1st Term", "2nd Term", "3rd Term"];
-    const nextTermIndex = termInYear === 3 ? 0 : termInYear;
     
     return { 
       year: graduationYear, 
@@ -3095,7 +3097,7 @@ const MenuLandingPage = ({
               Send Feedback
             </button>
             <a
-              href="https://solar.feutech.edu.ph/course/offerings"
+              href={STUDENT_PORTAL_URL}
               target="_blank"
               rel="noopener noreferrer"
               className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl border ${t.cardBorder} ${t.cardBg} ${t.textSecondary} hover:${t.textPrimary} transition`}
@@ -3357,6 +3359,36 @@ const GraduationPlannerPage = ({
     });
   };
 
+  // Swap two courses' status
+  const swapCourseStatus = () => {
+    if (selectedCourses.size !== 2) {
+      setErrorMsg("Select exactly 2 courses to swap their status");
+      setTimeout(() => setErrorMsg(""), 2000);
+      return;
+    }
+    
+    const [courseA, courseB] = Array.from(selectedCourses);
+    const statusA = courseStatus[courseA] || "inactive";
+    const statusB = courseStatus[courseB] || "inactive";
+    
+    const previousState = { ...courseStatus };
+    setCourseStatus(prev => ({
+      ...prev,
+      [courseA]: statusB,
+      [courseB]: statusA,
+    }));
+    
+    setMoveHistory(prev => [...prev, {
+      action: "swap",
+      courses: [courseA, courseB],
+      previousState
+    }]);
+    
+    setSelectedCourses(new Set());
+    setSuccessMsg(`Swapped status of ${courseA} and ${courseB}`);
+    setTimeout(() => setSuccessMsg(""), 2000);
+  };
+
   // Export plan as image (simulation - would need html2canvas in production)
   const exportAsImage = () => {
     setSuccessMsg("Plan exported! (Feature in development - use browser screenshot for now)");
@@ -3541,6 +3573,15 @@ END:VEVENT
                   >
                     Mark Inactive
                   </button>
+                  {selectedCourses.size === 2 && (
+                    <button
+                      onClick={swapCourseStatus}
+                      className={`px-3 py-1 rounded-lg text-xs font-medium bg-purple-100 text-purple-700 hover:bg-purple-200 transition flex items-center gap-1`}
+                    >
+                      <ArrowLeftRight className="w-3.5 h-3.5" />
+                      Swap Status
+                    </button>
+                  )}
                   <button
                     onClick={() => setSelectedCourses(new Set())}
                     className={`px-3 py-1 rounded-lg text-xs font-medium ${t.textMuted} hover:${t.textSecondary}`}
@@ -3835,14 +3876,19 @@ const ScheduleMakerPage = ({
   const [groupBy, setGroupBy] = useState("course"); // "course" | "department" | "room" | "section"
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState("table"); // "table" | "card"
-  const [scheduleData, setScheduleData] = useState([]);
 
   // Mock schedule data - in production, this would come from the student portal
   const mockSections = useMemo(() => {
     const sections = [];
     const days = ["M", "T", "W", "Th", "F", "S"];
+    const dayPairs = [["M", "W"], ["T", "Th"], ["M", "Th"], ["T", "F"], ["W", "F"], ["M", "F"]];
     const times = ["7:00 AM", "8:30 AM", "10:00 AM", "11:30 AM", "1:00 PM", "2:30 PM", "4:00 PM"];
     const rooms = ["R301", "R302", "R303", "R401", "R402", "LAB1", "LAB2"];
+    const instructorNames = [
+      "Prof. Santos", "Prof. Cruz", "Prof. Reyes", "Prof. Garcia", "Prof. Mendoza",
+      "Prof. Torres", "Prof. Flores", "Prof. Rivera", "Prof. Gonzales", "Prof. Ramos",
+      "Engr. Dela Cruz", "Engr. Villanueva", "Engr. Bautista", "Engr. Aquino", "Engr. Fernandez"
+    ];
     
     CURRICULUM_DATA.forEach(year => {
       year.terms.forEach(term => {
@@ -3853,10 +3899,10 @@ const ScheduleMakerPage = ({
             const numSections = Math.floor(Math.random() * 2) + 2;
             for (let i = 0; i < numSections; i++) {
               const sectionLetter = String.fromCharCode(65 + i);
-              const day1 = days[Math.floor(Math.random() * days.length)];
-              const day2 = days[Math.floor(Math.random() * days.length)];
+              const dayPair = dayPairs[Math.floor(Math.random() * dayPairs.length)];
               const time = times[Math.floor(Math.random() * times.length)];
               const room = rooms[Math.floor(Math.random() * rooms.length)];
+              const instructor = instructorNames[Math.floor(Math.random() * instructorNames.length)];
               
               sections.push({
                 id: `${course.id}-${sectionLetter}`,
@@ -3864,9 +3910,9 @@ const ScheduleMakerPage = ({
                 courseTitle: course.title,
                 section: sectionLetter,
                 units: course.units,
-                schedule: `${day1}/${day2} ${time}`,
+                schedule: `${dayPair[0]}/${dayPair[1]} ${time}`,
                 room: room,
-                instructor: `Prof. ${String.fromCharCode(65 + Math.floor(Math.random() * 26))}.`,
+                instructor: instructor,
                 slots: Math.floor(Math.random() * 40) + 5,
                 department: course.id.startsWith("CE") ? "CE" : course.id.startsWith("COE") ? "COE" : "GED",
               });
@@ -4025,7 +4071,7 @@ const ScheduleMakerPage = ({
             Build your mock enrolment schedule. Select sections and check for conflicts.
           </p>
           <p className={`text-xs ${t.heroText} opacity-70 mt-2`}>
-            Data source: <a href="https://solar.feutech.edu.ph/course/offerings" target="_blank" rel="noopener noreferrer" className="underline">solar.feutech.edu.ph/course/offerings</a>
+            Data source: <a href={STUDENT_PORTAL_URL} target="_blank" rel="noopener noreferrer" className="underline">solar.feutech.edu.ph/course/offerings</a>
           </p>
         </div>
       </div>
