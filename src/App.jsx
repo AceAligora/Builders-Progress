@@ -46,6 +46,9 @@ import {
   Users,
   Code,
   MapPin,
+  Zap,
+  Trash2,
+  RefreshCcw,
 } from "lucide-react";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/react";
@@ -3153,26 +3156,14 @@ const MenuLandingPage = ({
             {features.map((feature) => (
               <button
                 key={feature.id}
-                onClick={() => feature.id !== "schedule" && setActivePage(feature.id)}
-                disabled={feature.id === "schedule"}
-                className={`${t.cardBg} rounded-xl p-5 border ${t.cardBorder} ${feature.id === "schedule" ? "opacity-60 cursor-not-allowed" : `${t.cardHover} hover:shadow-xl cursor-pointer`} transition-all duration-300 text-left group w-full sm:w-64 relative`}
+                onClick={() => setActivePage(feature.id)}
+                className={`${t.cardBg} rounded-xl p-5 border ${t.cardBorder} ${t.cardHover} hover:shadow-xl cursor-pointer transition-all duration-300 text-left group w-full sm:w-64 relative`}
               >
-                {feature.id === "schedule" && (
-                  <div className="absolute -top-2 -right-2 bg-amber-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md">
-                    Coming Soon
-                  </div>
-                )}
-                <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${feature.color} flex items-center justify-center mb-3 ${feature.id !== "schedule" ? "group-hover:scale-110" : ""} transition-transform`}>
+                <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${feature.color} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
                   <feature.icon className="w-5 h-5 text-white" />
                 </div>
                 <h3 className={`font-semibold ${t.textPrimary} mb-1 text-sm`}>{feature.title}</h3>
                 <p className={`text-xs ${t.textSecondary}`}>{feature.description}</p>
-                {feature.id === "schedule" && (
-                  <div className={`mt-2 flex items-center gap-1 text-amber-600`}>
-                    <AlertTriangle className="w-3 h-3" />
-                    <span className="text-[10px] font-medium">Under Development</span>
-                  </div>
-                )}
               </button>
             ))}
           </div>
@@ -4002,67 +3993,195 @@ const ScheduleMakerPage = ({
   const [groupBy, setGroupBy] = useState("course"); // "course" | "department" | "room" | "section"
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState("table"); // "table" | "card"
+  const [importedSections, setImportedSections] = useState([]);
+  const [isImporting, setIsImporting] = useState(false);
+  const fileInputRef = useRef(null);
 
-  // Mock schedule data - in production, this would come from the student portal
-  const mockSections = useMemo(() => {
-    const sections = [];
-    const days = ["M", "T", "W", "Th", "F", "S"];
-    const dayPairs = [["M", "W"], ["T", "Th"], ["M", "Th"], ["T", "F"], ["W", "F"], ["M", "F"]];
-    const times = ["7:00 AM", "8:30 AM", "10:00 AM", "11:30 AM", "1:00 PM", "2:30 PM", "4:00 PM"];
-    const rooms = ["R301", "R302", "R303", "R401", "R402", "LAB1", "LAB2"];
-    const instructorNames = [
-      "Prof. Santos", "Prof. Cruz", "Prof. Reyes", "Prof. Garcia", "Prof. Mendoza",
-      "Prof. Torres", "Prof. Flores", "Prof. Rivera", "Prof. Gonzales", "Prof. Ramos",
-      "Engr. Dela Cruz", "Engr. Villanueva", "Engr. Bautista", "Engr. Aquino", "Engr. Fernandez"
-    ];
-    
+  // Get all curriculum course IDs for filtering
+  const curriculumCourseIds = useMemo(() => {
+    const ids = new Set();
     CURRICULUM_DATA.forEach(year => {
       year.terms.forEach(term => {
         term.courses.forEach(course => {
-          const status = courseStatus[course.id] || "inactive";
-          if (status !== "passed") {
-            // Generate 2-3 mock sections per course
-            const numSections = Math.floor(Math.random() * 2) + 2;
-            for (let i = 0; i < numSections; i++) {
-              const sectionLetter = String.fromCharCode(65 + i);
-              const dayPair = dayPairs[Math.floor(Math.random() * dayPairs.length)];
-              const time = times[Math.floor(Math.random() * times.length)];
-              const room = rooms[Math.floor(Math.random() * rooms.length)];
-              const instructor = instructorNames[Math.floor(Math.random() * instructorNames.length)];
-              
-              sections.push({
-                id: `${course.id}-${sectionLetter}`,
-                courseId: course.id,
-                courseTitle: course.title,
-                section: sectionLetter,
-                units: course.units,
-                schedule: `${dayPair[0]}/${dayPair[1]} ${time}`,
-                room: room,
-                instructor: instructor,
-                slots: Math.floor(Math.random() * 40) + 5,
-                department: course.id.startsWith("CE") ? "CE" : course.id.startsWith("COE") ? "COE" : "GED",
-              });
-            }
-          }
+          ids.add(course.id);
         });
       });
     });
-    
+    return ids;
+  }, []);
+
+  // Get course info from curriculum
+  const getCourseInfo = (courseId) => {
+    for (const year of CURRICULUM_DATA) {
+      for (const term of year.terms) {
+        const course = term.courses.find(c => c.id === courseId);
+        if (course) return course;
+      }
+    }
+    return null;
+  };
+
+  // Parse time string from JSON format (e.g., "7:00AM-8:30AM")
+  const parseTimeString = (timeStr) => {
+    if (!timeStr) return "";
+    // Handle format "7:00AM-8:30AM" -> "7:00 AM"
+    const startTime = timeStr.split('-')[0];
+    if (!startTime || startTime.trim() === '') return timeStr;
+    // Add space before AM/PM if not present
+    return startTime.replace(/([0-9])([AP]M)/i, '$1 $2');
+  };
+
+  // Constants for extension localStorage keys
+  const EXTENSION_STORAGE_KEYS = ['solarDataExtractor', 'buildersProgressData'];
+
+  // Process imported JSON data and filter to curriculum courses only
+  const processImportedData = (data) => {
+    if (!Array.isArray(data)) {
+      setErrorMsg("Invalid JSON format. Expected an array of sections.");
+      setTimeout(() => setErrorMsg(""), 4000);
+      return [];
+    }
+
+    const sections = [];
+    data.forEach((item, index) => {
+      // Extract course ID from the course field (e.g., "COE0001" from "COE0001 - Engineering Mathematics 1")
+      // Matches patterns like COE0001, CE0001, GED0001, NSTP1, COE0001L
+      const courseMatch = item.course?.match(/^([A-Z]{2,4}[0-9]{1,4}L?)/);
+      const courseId = courseMatch ? courseMatch[1] : null;
+      
+      if (!courseId) return;
+      
+      // Only include courses that are in the curriculum
+      if (!curriculumCourseIds.has(courseId)) return;
+
+      const courseInfo = getCourseInfo(courseId);
+      if (!courseInfo) return;
+
+      // Parse schedule
+      const schedule = `${item.day || ""} ${parseTimeString(item.time)}`.trim();
+      
+      // Use remaining slots as primary (available slots), fallback to classSize
+      const availableSlots = item.remaining ?? item.classSize ?? 0;
+      
+      sections.push({
+        id: `${courseId}-${item.section || index}`,
+        courseId: courseId,
+        courseTitle: courseInfo.title,
+        section: item.section || `Section ${index + 1}`,
+        units: courseInfo.units,
+        schedule: schedule,
+        room: item.room || "TBA",
+        slots: availableSlots,
+        classSize: item.classSize ?? 0,
+        isOutOfStock: item.isOutOfStock ?? false,
+        department: courseId.startsWith("CE") ? "CE" : courseId.startsWith("COE") ? "COE" : "GED",
+      });
+    });
+
     return sections;
-  }, [courseStatus]);
+  };
+
+  // Handle manual JSON file import
+  const handleFileImport = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    const reader = new FileReader();
+    
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target.result);
+        const sections = processImportedData(data);
+        
+        if (sections.length === 0) {
+          setErrorMsg("No valid curriculum courses found in the imported file.");
+          setTimeout(() => setErrorMsg(""), 4000);
+        } else {
+          setImportedSections(sections);
+          setSuccessMsg(`Successfully imported ${sections.length} sections from ${data.length} total entries.`);
+          setTimeout(() => setSuccessMsg(""), 4000);
+        }
+      } catch (err) {
+        setErrorMsg("Failed to parse JSON file. Please check the file format.");
+        setTimeout(() => setErrorMsg(""), 4000);
+      }
+      setIsImporting(false);
+    };
+
+    reader.onerror = () => {
+      setErrorMsg("Failed to read file.");
+      setTimeout(() => setErrorMsg(""), 3000);
+      setIsImporting(false);
+    };
+
+    reader.readAsText(file);
+    // Reset file input
+    event.target.value = '';
+  };
+
+  // Handle auto-import from Chrome Extension (SOLAR Data Extractor)
+  const handleAutoImport = () => {
+    setIsImporting(true);
+    
+    // Check for data from Chrome Extension via window message or localStorage
+    const checkForExtensionData = () => {
+      // Try localStorage keys used by known extensions
+      let storedData = null;
+      for (const key of EXTENSION_STORAGE_KEYS) {
+        storedData = localStorage.getItem(key);
+        if (storedData) break;
+      }
+      
+      if (storedData) {
+        try {
+          const data = JSON.parse(storedData);
+          const sections = processImportedData(data);
+          
+          if (sections.length > 0) {
+            setImportedSections(sections);
+            setSuccessMsg(`Auto-imported ${sections.length} sections from extension data.`);
+            setTimeout(() => setSuccessMsg(""), 4000);
+          } else {
+            setErrorMsg("No curriculum courses found in extension data.");
+            setTimeout(() => setErrorMsg(""), 4000);
+          }
+        } catch (err) {
+          setErrorMsg("Failed to parse extension data.");
+          setTimeout(() => setErrorMsg(""), 4000);
+        }
+      } else {
+        setErrorMsg("No data found from SOLAR Data Extractor. Please ensure the extension is installed and you've extracted data from SOLAR.");
+        setTimeout(() => setErrorMsg(""), 5000);
+      }
+      
+      setIsImporting(false);
+    };
+
+    // Small delay to allow extension data to be available
+    setTimeout(checkForExtensionData, 500);
+  };
+
+  // Clear imported data
+  const handleClearData = () => {
+    setImportedSections([]);
+    setSelectedSections([]);
+    setSuccessMsg("Cleared all imported data.");
+    setTimeout(() => setSuccessMsg(""), 2000);
+  };
 
   // Filter sections
   const filteredSections = useMemo(() => {
-    if (!searchQuery) return mockSections;
+    if (!searchQuery) return importedSections;
     const query = searchQuery.toLowerCase();
-    return mockSections.filter(s =>
+    return importedSections.filter(s =>
       s.courseId.toLowerCase().includes(query) ||
       s.courseTitle.toLowerCase().includes(query) ||
       s.section.toLowerCase().includes(query) ||
       s.room.toLowerCase().includes(query) ||
       s.schedule.toLowerCase().includes(query)
     );
-  }, [mockSections, searchQuery]);
+  }, [importedSections, searchQuery]);
 
   // Group sections
   const groupedSections = useMemo(() => {
@@ -4324,7 +4443,7 @@ const ScheduleMakerPage = ({
             </h1>
           </div>
           <p className={`${t.heroText} opacity-90 text-sm md:text-base`}>
-            Build your mock enrolment schedule. Select sections and check for conflicts.
+            Build your mock enrolment schedule. Import course offerings and check for conflicts.
           </p>
           <p className={`text-xs ${t.heroText} opacity-70 mt-2`}>
             Data source: <a href={STUDENT_PORTAL_URL} target="_blank" rel="noopener noreferrer" className="underline">solar.feutech.edu.ph/course/offerings</a>
@@ -4335,30 +4454,148 @@ const ScheduleMakerPage = ({
       {/* Main Content */}
       <div className={`${t.bodyBg} flex-1`}>
         <div className="max-w-6xl mx-auto px-4 py-6">
-          {/* Warnings Panel */}
-          {scheduleWarnings.length > 0 && (
-            <div className={`mb-6 ${t.cardBg} rounded-xl border border-orange-300 p-4`}>
-              <div className="flex items-center gap-2 mb-3">
-                <AlertTriangle className="w-5 h-5 text-orange-500" />
-                <h3 className={`font-semibold ${t.textPrimary}`}>Schedule Warnings</h3>
-              </div>
-              <div className="space-y-2">
-                {scheduleWarnings.map((warning, idx) => (
-                  <div key={idx} className="flex items-start gap-2 text-sm">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${
-                      warning.type === "credit" ? "bg-red-100 text-red-700" :
-                      warning.type === "prereq" ? "bg-orange-100 text-orange-700" :
-                      "bg-amber-100 text-amber-700"
-                    }`}>
-                      {warning.type === "credit" ? "Credit" : 
-                       warning.type === "prereq" ? "Prereq" : "Petition"}
-                    </span>
-                    <span className={t.textSecondary}>{warning.message}</span>
+          
+          {/* Import Panel - Show when no data is imported */}
+          {importedSections.length === 0 ? (
+            <div className={`${t.cardBg} rounded-xl border ${t.cardBorder} p-8`}>
+              <div className="max-w-lg mx-auto text-center">
+                <Upload className={`w-16 h-16 mx-auto ${t.textMuted} mb-4`} />
+                <h2 className={`text-xl font-bold ${t.textPrimary} mb-2`}>Import Course Offerings</h2>
+                <p className={`${t.textSecondary} text-sm mb-6`}>
+                  Import course offerings data from the SOLAR Data Extractor or upload a JSON file manually.
+                  Only courses in the CE curriculum will be shown.
+                </p>
+                
+                <div className="space-y-4">
+                  {/* Auto Import Button */}
+                  <button
+                    onClick={handleAutoImport}
+                    disabled={isImporting}
+                    className={`w-full ${t.primaryBtn} ${t.primaryBtnText} px-6 py-3 rounded-lg font-medium transition flex items-center justify-center gap-2`}
+                  >
+                    {isImporting ? (
+                      <>
+                        <RefreshCcw className="w-4 h-4 animate-spin" />
+                        Checking for data...
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="w-4 h-4" />
+                        Auto-Import from Extension
+                      </>
+                    )}
+                  </button>
+                  
+                  <div className={`flex items-center gap-4 ${t.textMuted} text-sm`}>
+                    <div className="flex-1 h-px bg-current opacity-30"></div>
+                    <span>or</span>
+                    <div className="flex-1 h-px bg-current opacity-30"></div>
                   </div>
-                ))}
+                  
+                  {/* Manual Import Button */}
+                  <div>
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleFileImport}
+                      accept=".json"
+                      className="hidden"
+                    />
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isImporting}
+                      className={`w-full border ${t.cardBorder} ${t.textSecondary} hover:${t.textPrimary} px-6 py-3 rounded-lg font-medium transition flex items-center justify-center gap-2`}
+                    >
+                      <FileText className="w-4 h-4" />
+                      Import JSON File Manually
+                    </button>
+                  </div>
+                </div>
+                
+                {/* JSON Format Info */}
+                <div className={`mt-8 p-4 rounded-lg ${t.secondaryBg} text-left`}>
+                  <h3 className={`text-sm font-semibold ${t.textPrimary} mb-2`}>Expected JSON Format:</h3>
+                  <pre className={`text-xs ${t.textMuted} overflow-x-auto`}>
+{`[
+  {
+    "course": "COE0001 - Engineering Math 1",
+    "section": "A",
+    "classSize": 40,
+    "remaining": 15,
+    "day": "M/W",
+    "time": "7:00AM-8:30AM",
+    "room": "R301",
+    "isOutOfStock": false
+  },
+  ...
+]`}
+                  </pre>
+                </div>
+                
+                <p className={`mt-4 text-xs ${t.textMuted}`}>
+                  Install the <strong>SOLAR Data Extractor</strong> or <strong>BuildersProgressDataExtractor</strong> Chrome extension 
+                  to automatically extract course offerings from SOLAR.
+                </p>
               </div>
             </div>
-          )}
+          ) : (
+            <>
+              {/* Data Imported - Show schedule builder */}
+              
+              {/* Import Actions Bar */}
+              <div className={`mb-6 p-4 ${t.cardBg} rounded-xl border ${t.cardBorder} flex flex-wrap items-center justify-between gap-4`}>
+                <div className={`text-sm ${t.textSecondary}`}>
+                  <span className="font-medium">{importedSections.length}</span> curriculum sections imported
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileImport}
+                    accept=".json"
+                    className="hidden"
+                  />
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`text-xs px-3 py-1.5 rounded-lg border ${t.cardBorder} ${t.textSecondary} hover:opacity-80 flex items-center gap-1`}
+                  >
+                    <RefreshCcw className="w-3 h-3" />
+                    Re-import
+                  </button>
+                  <button
+                    onClick={handleClearData}
+                    className="text-xs px-3 py-1.5 rounded-lg border border-red-300 text-red-600 hover:bg-red-50 flex items-center gap-1"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    Clear
+                  </button>
+                </div>
+              </div>
+              
+              {/* Warnings Panel */}
+              {scheduleWarnings.length > 0 && (
+                <div className={`mb-6 ${t.cardBg} rounded-xl border border-orange-300 p-4`}>
+                  <div className="flex items-center gap-2 mb-3">
+                    <AlertTriangle className="w-5 h-5 text-orange-500" />
+                    <h3 className={`font-semibold ${t.textPrimary}`}>Schedule Warnings</h3>
+                  </div>
+                  <div className="space-y-2">
+                    {scheduleWarnings.map((warning, idx) => (
+                      <div key={idx} className="flex items-start gap-2 text-sm">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${
+                          warning.type === "credit" ? "bg-red-100 text-red-700" :
+                          warning.type === "prereq" ? "bg-orange-100 text-orange-700" :
+                          "bg-amber-100 text-amber-700"
+                        }`}>
+                          {warning.type === "credit" ? "Credit" : 
+                           warning.type === "prereq" ? "Prereq" : "Petition"}
+                        </span>
+                        <span className={t.textSecondary}>{warning.message}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
           {/* Summary Stats */}
           <div className="grid md:grid-cols-3 gap-4 mb-6">
@@ -4624,6 +4861,8 @@ const ScheduleMakerPage = ({
               </div>
             </div>
           </div>
+            </>
+          )}
         </div>
       </div>
     </>
@@ -4856,13 +5095,15 @@ const App = () => {
             </button>
             <button
               type="button"
-              disabled
-              title="Coming Soon - Under Development"
-              className={`inline-flex items-center gap-1 px-2 md:px-3 py-1.5 rounded-full border text-xs md:text-sm transition ${t.cardBg} ${t.textMuted} ${t.cardBorder} opacity-50 cursor-not-allowed relative`}
+              onClick={() => setActivePage("schedule")}
+              className={`inline-flex items-center gap-1 px-2 md:px-3 py-1.5 rounded-full border text-xs md:text-sm transition ${
+                activePage === "schedule"
+                  ? t.navActive
+                  : `${t.cardBg} ${t.textSecondary} ${t.cardBorder} hover:opacity-80`
+              }`}
             >
               <Table className="w-4 h-4" />
               <span className="hidden md:inline">Schedule</span>
-              <span className="absolute -top-1 -right-1 w-2 h-2 bg-amber-500 rounded-full"></span>
             </button>
             <button
               type="button"
