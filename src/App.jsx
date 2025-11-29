@@ -25,10 +25,35 @@ import {
   Link2,
   ZoomIn,
   ZoomOut,
+  Home,
+  Clock,
+  FileText,
+  Settings,
+  Undo2,
+  History,
+  Move,
+  ArrowLeftRight,
+  Inbox,
+  Sparkles,
+  MessageSquare,
+  Info,
+  ChevronDown,
+  Image,
+  Table,
+  Layers,
+  Search,
+  Save,
+  Building2,
+  Users,
+  Code,
+  MapPin,
 } from "lucide-react";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 import Confetti from "react-confetti";
+
+// Configuration constants
+const STUDENT_PORTAL_URL = "https://solar.feutech.edu.ph/course/offerings";
 
 // --- DATA: Full Civil Engineering Curriculum (FEU Tech BSCE) ---
 const CURRICULUM_DATA = [
@@ -245,6 +270,25 @@ const isAutoSyncedLabId = (courseId) => {
 
 const getCoreqLectureId = (courseId) =>
   courseId.endsWith("L") ? courseId.slice(0, -1) : null;
+
+// Petition-required courses - courses that typically require petition for out-of-sequence taking
+// These include internship, projects, and specialized courses with multiple prerequisites
+const PETITION_REQUIRED_COURSES = new Set([
+  "CE0067", // Internship for CE
+  "CE0057", // CE Project 1
+  "CE0071", // CE Project 2
+  "CE0043", // Professional Course 1 – Earthquake Engineering
+  "CE0045", // Professional Course 2 – Reinforced Concrete Design
+  "CE0059", // Professional Course 3 – Design of Steel Structures
+  "CE0061", // Professional Course 4 – Prestressed Concrete Design
+  "CE0073", // Professional Course 5 – Foundation and Retaining Wall
+  "CE0075", // Professional Course 6 – Computer Software in Structural Analysis
+  "CE0077", // Technical Elective for CE - COSH
+  "CE0069", // CE Correlation Course 3
+]);
+
+// Check if a course requires petition for out-of-sequence enrollment
+const isPetitionRequired = (courseId) => PETITION_REQUIRED_COURSES.has(courseId);
 
 const isLabCourse = (course) => course.id.endsWith("L");
 
@@ -1075,6 +1119,33 @@ const CurriculumTrackerPage = ({
               </button>
             </div>
 
+            {/* Data Management Actions */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={exportToClipboard}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1 border ${t.cardBorder} ${t.textSecondary} hover:${t.textPrimary}`}
+                title="Copy progress to clipboard"
+              >
+                <Copy className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Copy</span>
+              </button>
+              <button
+                onClick={exportToFile}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1 border ${t.cardBorder} ${t.textSecondary} hover:${t.textPrimary}`}
+                title="Download backup file"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Export</span>
+              </button>
+              <button
+                onClick={() => setShowImportModal(true)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1 border ${t.cardBorder} ${t.textSecondary} hover:${t.textPrimary}`}
+                title="Import progress data"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Import</span>
+              </button>
+            </div>
 
           </div>
 
@@ -1201,7 +1272,12 @@ const CurriculumTrackerPage = ({
                                     onMouseEnter={() => setHoveredCourse(course.id)}
                                     onMouseLeave={() => setHoveredCourse(null)}
                                   >
-                                    <td className="py-2 px-2 font-mono">{course.id}</td>
+                                    <td className="py-2 px-2 font-mono">
+                                      {course.id}
+                                      {isPetitionRequired(course.id) && (
+                                        <span className="ml-1 text-[10px] bg-amber-500 text-white px-1 rounded" title="Petition may be required">P</span>
+                                      )}
+                                    </td>
                                     <td className="py-2 px-2">{course.title}</td>
                                     <td className="py-2 px-2 text-center">{course.units}</td>
                                     <td className="py-2 px-2 text-center">{term.termName}</td>
@@ -1348,6 +1424,11 @@ const CurriculumTrackerPage = ({
                                       {lab && (
                                         <span className="text-[9px] uppercase tracking-wide bg-slate-800 text-slate-50 px-1.5 py-0.5 rounded-full">
                                           Laboratory
+                                        </span>
+                                      )}
+                                      {isPetitionRequired(course.id) && (
+                                        <span className="text-[9px] uppercase tracking-wide bg-amber-500 text-white px-1.5 py-0.5 rounded-full" title="Petition may be required">
+                                          Petition
                                         </span>
                                       )}
                                     </div>
@@ -2660,13 +2741,1628 @@ const ChainVisualizerPage = ({ theme, courseStatus }) => {
   );
 };
 
+// ---------------- MENU LANDING PAGE ----------------
+const MenuLandingPage = ({ 
+  theme, 
+  setActivePage, 
+  courseStatus,
+  yearEnteredCollege,
+  setYearEnteredCollege,
+  setSuccessMsg,
+  setErrorMsg,
+}) => {
+  const t = THEMES[theme];
+  const [showWhatsNew, setShowWhatsNew] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [feedbackText, setFeedbackText] = useState("");
+
+  // Calculate progress stats
+  const totalCourses = CURRICULUM_DATA.reduce(
+    (acc, year) => acc + year.terms.reduce((tAcc, term) => tAcc + term.courses.length, 0),
+    0
+  );
+  const passedCourses = Object.values(courseStatus).filter(s => s === "passed").length;
+  const activeCourses = Object.values(courseStatus).filter(s => s === "taking").length;
+  const progressPercent = totalCourses > 0 ? Math.round((passedCourses / totalCourses) * 100) : 0;
+
+  // Calculate total and completed units
+  const totalUnits = CURRICULUM_DATA.reduce(
+    (acc, year) =>
+      acc + year.terms.reduce((tAcc, term) => tAcc + term.courses.reduce((cAcc, c) => cAcc + c.units, 0), 0),
+    0
+  );
+  const completedUnits = Object.entries(courseStatus).reduce((acc, [id, status]) => {
+    if (status === "passed") {
+      for (const year of CURRICULUM_DATA) {
+        for (const term of year.terms) {
+          for (const c of term.courses) {
+            if (c.id === id) return acc + c.units;
+          }
+        }
+      }
+    }
+    return acc;
+  }, 0);
+
+  // Calculate expected graduation
+  const calculateExpectedGraduation = () => {
+    if (!yearEnteredCollege) return null;
+    const entryYear = parseInt(yearEnteredCollege);
+    if (isNaN(entryYear)) return null;
+
+    // Find the last term with incomplete courses
+    let lastIncompleteTermIndex = -1;
+    CURRICULUM_DATA.forEach((year, yIdx) => {
+      year.terms.forEach((term, tIdx) => {
+        const termIndex = yIdx * 3 + tIdx;
+        const hasIncompleteCourses = term.courses.some(
+          c => courseStatus[c.id] !== "passed"
+        );
+        if (hasIncompleteCourses) {
+          lastIncompleteTermIndex = Math.max(lastIncompleteTermIndex, termIndex);
+        }
+      });
+    });
+
+    if (lastIncompleteTermIndex === -1) {
+      // All courses passed!
+      return { year: entryYear + 4, term: "Completed!" };
+    }
+
+    // Calculate graduation based on last incomplete term
+    const yearsFromStart = Math.floor(lastIncompleteTermIndex / 3);
+    const termInYear = (lastIncompleteTermIndex % 3) + 1;
+    const graduationYear = entryYear + yearsFromStart + (termInYear === 3 ? 1 : 0);
+    const termNames = ["1st Term", "2nd Term", "3rd Term"];
+    
+    return { 
+      year: graduationYear, 
+      term: termInYear === 3 ? termNames[0] : termNames[termInYear]
+    };
+  };
+
+  const expectedGraduation = calculateExpectedGraduation();
+
+  // Features for the landing page
+  const features = [
+    {
+      id: "tracker",
+      title: "Curriculum Tracker",
+      description: "Track your academic progress through the CE curriculum with detailed status for each course.",
+      icon: LayoutTemplate,
+      color: "from-green-500 to-emerald-600",
+    },
+    {
+      id: "gpa",
+      title: "GPA Calculator",
+      description: "Calculate your term and cumulative GPA with target grade planning tools.",
+      icon: Calculator,
+      color: "from-blue-500 to-indigo-600",
+    },
+    {
+      id: "visualizer",
+      title: "Chain Visualizer",
+      description: "Visualize prerequisite chains and understand course dependencies at a glance.",
+      icon: Link2,
+      color: "from-purple-500 to-violet-600",
+    },
+    {
+      id: "planner",
+      title: "Graduation Planner",
+      description: "Plan your path to graduation with smart scheduling and conflict detection.",
+      icon: Calendar,
+      color: "from-orange-500 to-amber-600",
+    },
+    {
+      id: "schedule",
+      title: "Schedule Maker",
+      description: "Build mock enrolments by selecting course sections and checking for schedule conflicts.",
+      icon: Table,
+      color: "from-pink-500 to-rose-600",
+    },
+  ];
+
+  // What's New content
+  const whatsNewItems = [
+    "Menu Landing Page for quick access to all tools",
+    "Expected Graduation Timeline calculation",
+    "Detailed Progress Bars per Term/Year",
+    "Table and Compact Views of the Curriculum",
+    "Export/Save current progress functionality",
+    "Graduation Planner with smart scheduling",
+    "Enhanced conflict detection with warnings",
+    "Undo functionality and move history tracking",
+    "Bulk course selection and moving",
+    "Course swapping between terms",
+    "Priority settings for subjects",
+    "Mobile-friendly floating plan actions",
+    "Rounded corners for all dialogs",
+    "Enhanced search and filtering",
+    "Better course data extraction",
+    "Academic-year format labels",
+  ];
+
+  return (
+    <>
+      {/* Hero Section */}
+      <div className={`bg-gradient-to-br ${t.heroGradient} text-white py-16 px-6`}>
+        <div className="max-w-6xl mx-auto">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-8">
+            <div className="text-center md:text-left">
+              <div className="flex items-center gap-3 mb-4 justify-center md:justify-start">
+                <GraduationCap className={`w-12 h-12 ${t.heroAccent}`} />
+                <h1 className="text-4xl md:text-5xl font-bold tracking-tight">
+                  Builders Progress
+                </h1>
+              </div>
+              <p className={`${t.heroText} opacity-90 text-lg md:text-xl max-w-xl`}>
+                Your complete academic companion for the BSCE curriculum at FEU Tech. 
+                Track progress, calculate GPA, and plan your path to graduation.
+              </p>
+              
+              {/* Quick Stats */}
+              <div className="flex flex-wrap gap-4 mt-6 justify-center md:justify-start">
+                <div className={`px-4 py-2 rounded-lg bg-white/10 backdrop-blur-sm border border-white/20`}>
+                  <span className="text-2xl font-bold">{progressPercent}%</span>
+                  <span className="text-sm opacity-80 ml-2">Complete</span>
+                </div>
+                <div className={`px-4 py-2 rounded-lg bg-white/10 backdrop-blur-sm border border-white/20`}>
+                  <span className="text-2xl font-bold">{completedUnits}</span>
+                  <span className="text-sm opacity-80 ml-2">/ {totalUnits} Units</span>
+                </div>
+                {activeCourses > 0 && (
+                  <div className={`px-4 py-2 rounded-lg bg-white/10 backdrop-blur-sm border border-white/20`}>
+                    <span className="text-2xl font-bold">{activeCourses}</span>
+                    <span className="text-sm opacity-80 ml-2">Active</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Expected Graduation Card */}
+            <div className={`${t.cardBg} rounded-2xl p-6 shadow-2xl max-w-sm w-full`}>
+              <div className="flex items-center gap-2 mb-4">
+                <Clock className={`w-5 h-5 ${t.accentText}`} />
+                <h3 className={`font-semibold ${t.textPrimary}`}>Expected Graduation</h3>
+              </div>
+              
+              {!yearEnteredCollege ? (
+                <div className="space-y-3">
+                  <p className={`text-sm ${t.textSecondary}`}>
+                    Enter the year you started college to calculate your expected graduation.
+                  </p>
+                  <input
+                    type="number"
+                    min="2015"
+                    max="2030"
+                    placeholder="e.g., 2022"
+                    value={yearEnteredCollege}
+                    onChange={(e) => setYearEnteredCollege(e.target.value)}
+                    className={`w-full px-4 py-2 rounded-lg border ${t.cardBorder} ${t.cardBg} ${t.textPrimary} text-center text-lg font-semibold`}
+                  />
+                </div>
+              ) : expectedGraduation ? (
+                <div className="text-center">
+                  <div className={`text-4xl font-bold ${t.accentText} mb-1`}>
+                    {expectedGraduation.term === "Completed!" ? "🎉" : expectedGraduation.year}
+                  </div>
+                  <div className={`text-sm ${t.textSecondary}`}>
+                    {expectedGraduation.term === "Completed!" 
+                      ? "Congratulations! You've completed all courses!" 
+                      : `${expectedGraduation.term}, S.Y. ${expectedGraduation.year}-${expectedGraduation.year + 1}`}
+                  </div>
+                  <button
+                    onClick={() => setYearEnteredCollege("")}
+                    className={`mt-3 text-xs ${t.textMuted} hover:${t.textSecondary} underline`}
+                  >
+                    Change entry year
+                  </button>
+                </div>
+              ) : (
+                <div className={`text-sm ${t.textMuted} text-center`}>
+                  Unable to calculate graduation date.
+                </div>
+              )}
+
+              {/* Progress Bar */}
+              <div className="mt-4">
+                <div className="flex justify-between text-xs mb-1">
+                  <span className={t.textMuted}>Progress</span>
+                  <span className={t.textSecondary}>{progressPercent}%</span>
+                </div>
+                <div className={`h-2 rounded-full ${t.secondaryBg} overflow-hidden`}>
+                  <div 
+                    className={`h-full bg-gradient-to-r ${t.progressBar} transition-all duration-500`}
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Features Grid */}
+      <div className={`${t.bodyBg} py-12 px-6`}>
+        <div className="max-w-6xl mx-auto">
+          <h2 className={`text-2xl font-bold ${t.textPrimary} mb-8 text-center`}>
+            Academic Tools
+          </h2>
+          
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+            {features.map((feature) => (
+              <button
+                key={feature.id}
+                onClick={() => setActivePage(feature.id)}
+                className={`${t.cardBg} rounded-xl p-5 border ${t.cardBorder} ${t.cardHover} hover:shadow-xl transition-all duration-300 text-left group`}
+              >
+                <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${feature.color} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
+                  <feature.icon className="w-5 h-5 text-white" />
+                </div>
+                <h3 className={`font-semibold ${t.textPrimary} mb-1 text-sm`}>{feature.title}</h3>
+                <p className={`text-xs ${t.textSecondary}`}>{feature.description}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Progress Overview Section */}
+      <div className={`${t.secondaryBg} py-12 px-6 border-t ${t.cardBorder}`}>
+        <div className="max-w-6xl mx-auto">
+          <h2 className={`text-2xl font-bold ${t.textPrimary} mb-8 text-center`}>
+            Progress by Year
+          </h2>
+          
+          <div className="grid md:grid-cols-4 gap-4">
+            {CURRICULUM_DATA.map((year, yIdx) => {
+              const yearCourses = year.terms.flatMap(t => t.courses);
+              const yearPassed = yearCourses.filter(c => courseStatus[c.id] === "passed").length;
+              const yearTotal = yearCourses.length;
+              const yearPercent = yearTotal > 0 ? Math.round((yearPassed / yearTotal) * 100) : 0;
+              const yearUnits = yearCourses.reduce((acc, c) => acc + c.units, 0);
+              const yearPassedUnits = yearCourses
+                .filter(c => courseStatus[c.id] === "passed")
+                .reduce((acc, c) => acc + c.units, 0);
+
+              return (
+                <div key={yIdx} className={`${t.cardBg} rounded-xl p-4 border ${t.cardBorder}`}>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className={`font-semibold ${t.textPrimary} text-sm`}>{year.year}</h3>
+                    <span className={`text-xs ${t.textMuted}`}>{yearPercent}%</span>
+                  </div>
+                  
+                  <div className={`h-2 rounded-full ${t.secondaryBg} overflow-hidden mb-3`}>
+                    <div 
+                      className={`h-full bg-gradient-to-r ${t.progressBar} transition-all duration-500`}
+                      style={{ width: `${yearPercent}%` }}
+                    />
+                  </div>
+                  
+                  <div className={`text-xs ${t.textSecondary} space-y-1`}>
+                    <div className="flex justify-between">
+                      <span>Courses</span>
+                      <span>{yearPassed}/{yearTotal}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Units</span>
+                      <span>{yearPassedUnits}/{yearUnits}</span>
+                    </div>
+                  </div>
+
+                  {/* Term breakdown */}
+                  <div className="mt-3 pt-3 border-t border-slate-100 space-y-2">
+                    {year.terms.map((term, tIdx) => {
+                      const termPassed = term.courses.filter(c => courseStatus[c.id] === "passed").length;
+                      const termTotal = term.courses.length;
+                      const termPercent = termTotal > 0 ? Math.round((termPassed / termTotal) * 100) : 0;
+                      
+                      return (
+                        <div key={tIdx} className="flex items-center gap-2">
+                          <span className={`text-[10px] ${t.textMuted} w-12`}>{term.termName}</span>
+                          <div className={`flex-1 h-1.5 rounded-full ${t.secondaryBg} overflow-hidden`}>
+                            <div 
+                              className={`h-full bg-gradient-to-r ${t.progressBar} transition-all`}
+                              style={{ width: `${termPercent}%` }}
+                            />
+                          </div>
+                          <span className={`text-[10px] ${t.textMuted} w-8 text-right`}>{termPercent}%</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Actions */}
+      <div className={`${t.bodyBg} py-8 px-6 border-t ${t.cardBorder}`}>
+        <div className="max-w-6xl mx-auto">
+          <div className="flex flex-wrap justify-center gap-4">
+            <button
+              onClick={() => setShowWhatsNew(true)}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl border ${t.cardBorder} ${t.cardBg} ${t.textSecondary} hover:${t.textPrimary} transition`}
+            >
+              <Sparkles className="w-4 h-4" />
+              What's New
+            </button>
+            <button
+              onClick={() => setShowFeedback(true)}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl border ${t.cardBorder} ${t.cardBg} ${t.textSecondary} hover:${t.textPrimary} transition`}
+            >
+              <MessageSquare className="w-4 h-4" />
+              Send Feedback
+            </button>
+            <a
+              href={STUDENT_PORTAL_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl border ${t.cardBorder} ${t.cardBg} ${t.textSecondary} hover:${t.textPrimary} transition`}
+            >
+              <BookOpen className="w-4 h-4" />
+              Student Portal
+            </a>
+          </div>
+        </div>
+      </div>
+
+      {/* What's New Modal */}
+      {showWhatsNew && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className={`${t.cardBg} rounded-2xl shadow-2xl max-w-lg w-full p-6 max-h-[80vh] overflow-y-auto`}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className={`text-lg font-semibold ${t.textPrimary} flex items-center gap-2`}>
+                <Sparkles className={`w-5 h-5 ${t.accentText}`} />
+                What's New
+              </h3>
+              <button
+                onClick={() => setShowWhatsNew(false)}
+                className={`${t.textMuted} hover:${t.textSecondary} p-1`}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="space-y-2">
+              {whatsNewItems.map((item, idx) => (
+                <div key={idx} className={`flex items-start gap-2 p-2 rounded-lg ${t.secondaryBg}`}>
+                  <Check className={`w-4 h-4 ${t.accentText} mt-0.5 flex-shrink-0`} />
+                  <span className={`text-sm ${t.textSecondary}`}>{item}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Feedback Modal */}
+      {showFeedback && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className={`${t.cardBg} rounded-2xl shadow-2xl max-w-lg w-full p-6`}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className={`text-lg font-semibold ${t.textPrimary} flex items-center gap-2`}>
+                <MessageSquare className={`w-5 h-5 ${t.accentText}`} />
+                Send Feedback
+              </h3>
+              <button
+                onClick={() => setShowFeedback(false)}
+                className={`${t.textMuted} hover:${t.textSecondary} p-1`}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <p className={`text-sm ${t.textSecondary} mb-4`}>
+              We'd love to hear your thoughts! Share your feedback, suggestions, or report any issues.
+            </p>
+            
+            <textarea
+              value={feedbackText}
+              onChange={(e) => setFeedbackText(e.target.value)}
+              placeholder="Type your feedback here..."
+              className={`w-full h-32 p-3 border ${t.cardBorder} rounded-xl text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${t.cardBg} ${t.textPrimary}`}
+            />
+            
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={() => {
+                  if (feedbackText.trim()) {
+                    // In a real app, this would send to a backend
+                    setSuccessMsg("Thank you for your feedback!");
+                    setTimeout(() => setSuccessMsg(""), 3000);
+                    setFeedbackText("");
+                    setShowFeedback(false);
+                  }
+                }}
+                disabled={!feedbackText.trim()}
+                className={`flex-1 ${t.primaryBtn} ${t.primaryBtnText} py-2 px-4 rounded-xl text-sm font-medium transition disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                Send Feedback
+              </button>
+              <button
+                onClick={() => setShowFeedback(false)}
+                className={`px-4 py-2 rounded-xl ${t.secondaryBg} ${t.textSecondary} text-sm font-medium hover:opacity-80 transition`}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Footer */}
+      <footer className={`${t.secondaryBg} border-t ${t.cardBorder} py-6 px-6`}>
+        <div className="max-w-6xl mx-auto text-center">
+          <p className={`text-sm ${t.textMuted}`}>
+            Built for CE students at FEU Institute of Technology
+          </p>
+          <p className={`text-xs ${t.textMuted} mt-1`}>
+            Data is stored locally on your device. Export your progress regularly for backup.
+          </p>
+        </div>
+      </footer>
+    </>
+  );
+};
+
+// ---------------- GRADUATION PLANNER PAGE ----------------
+const GraduationPlannerPage = ({ 
+  theme, 
+  courseStatus, 
+  setCourseStatus,
+  setSuccessMsg,
+  setErrorMsg,
+  onConfetti,
+}) => {
+  const t = THEMES[theme];
+  const [planView, setPlanView] = useState("timeline"); // "timeline" | "table" | "compact"
+  const [moveHistory, setMoveHistory] = useState([]);
+  const [selectedCourses, setSelectedCourses] = useState(new Set());
+  const [showUnscheduled, setShowUnscheduled] = useState(true);
+  const [coursePriorities, setCoursePriorities] = useState({});
+  const [lockedCourses, setLockedCourses] = useState({});
+  const [showPriorityModal, setShowPriorityModal] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [groupBy, setGroupBy] = useState("term"); // "term" | "year" | "department"
+
+  // Load saved settings
+  useEffect(() => {
+    const savedPriorities = localStorage.getItem("ce_course_priorities");
+    if (savedPriorities) setCoursePriorities(JSON.parse(savedPriorities));
+    
+    const savedLocked = localStorage.getItem("ce_locked_courses");
+    if (savedLocked) setLockedCourses(JSON.parse(savedLocked));
+  }, []);
+
+  // Save settings
+  useEffect(() => {
+    localStorage.setItem("ce_course_priorities", JSON.stringify(coursePriorities));
+  }, [coursePriorities]);
+
+  useEffect(() => {
+    localStorage.setItem("ce_locked_courses", JSON.stringify(lockedCourses));
+  }, [lockedCourses]);
+
+  // Get all courses flattened
+  const allCourses = useMemo(() => {
+    const courses = [];
+    CURRICULUM_DATA.forEach((year, yIdx) => {
+      year.terms.forEach((term, tIdx) => {
+        term.courses.forEach((course) => {
+          courses.push({
+            ...course,
+            yearIndex: yIdx,
+            termIndex: tIdx,
+            yearName: year.year,
+            termName: term.termName,
+            status: courseStatus[course.id] || "inactive",
+          });
+        });
+      });
+    });
+    return courses;
+  }, [courseStatus]);
+
+  // Filter courses based on search
+  const filteredCourses = useMemo(() => {
+    if (!searchQuery) return allCourses;
+    const query = searchQuery.toLowerCase();
+    return allCourses.filter(c => 
+      c.id.toLowerCase().includes(query) ||
+      c.title.toLowerCase().includes(query)
+    );
+  }, [allCourses, searchQuery]);
+
+  // Get unscheduled courses (not passed, not taking)
+  const unscheduledCourses = allCourses.filter(c => 
+    c.status === "inactive" && 
+    !lockedCourses[c.id]
+  );
+
+  // Undo last action
+  const handleUndo = () => {
+    if (moveHistory.length === 0) return;
+    
+    const lastAction = moveHistory[moveHistory.length - 1];
+    setCourseStatus(lastAction.previousState);
+    setMoveHistory(prev => prev.slice(0, -1));
+    setSuccessMsg("Action undone successfully!");
+    setTimeout(() => setSuccessMsg(""), 2000);
+  };
+
+  // Toggle course selection
+  const toggleCourseSelection = (courseId) => {
+    setSelectedCourses(prev => {
+      const next = new Set(prev);
+      if (next.has(courseId)) {
+        next.delete(courseId);
+      } else {
+        next.add(courseId);
+      }
+      return next;
+    });
+  };
+
+  // Move selected courses to a status
+  const moveSelectedToStatus = (newStatus) => {
+    if (selectedCourses.size === 0) return;
+    
+    const previousState = { ...courseStatus };
+    setCourseStatus(prev => {
+      const next = { ...prev };
+      selectedCourses.forEach(id => {
+        next[id] = newStatus;
+      });
+      return next;
+    });
+    
+    setMoveHistory(prev => [...prev, { 
+      action: "bulk_move", 
+      courses: Array.from(selectedCourses),
+      previousState 
+    }]);
+    
+    setSelectedCourses(new Set());
+    setSuccessMsg(`Moved ${selectedCourses.size} course(s) to ${newStatus}`);
+    setTimeout(() => setSuccessMsg(""), 2000);
+    
+    if (newStatus === "passed" && onConfetti) {
+      onConfetti("small");
+    }
+  };
+
+  // Set course priority
+  const setPriority = (courseId, priority) => {
+    setCoursePriorities(prev => ({
+      ...prev,
+      [courseId]: priority
+    }));
+    setShowPriorityModal(null);
+  };
+
+  // Lock course to term
+  const toggleLock = (courseId) => {
+    setLockedCourses(prev => {
+      const next = { ...prev };
+      if (next[courseId]) {
+        delete next[courseId];
+      } else {
+        const course = allCourses.find(c => c.id === courseId);
+        if (course) {
+          next[courseId] = { yearIndex: course.yearIndex, termIndex: course.termIndex };
+        }
+      }
+      return next;
+    });
+  };
+
+  // Swap two courses' status
+  const swapCourseStatus = () => {
+    if (selectedCourses.size !== 2) {
+      setErrorMsg("Select exactly 2 courses to swap their status");
+      setTimeout(() => setErrorMsg(""), 2000);
+      return;
+    }
+    
+    const [courseA, courseB] = Array.from(selectedCourses);
+    const statusA = courseStatus[courseA] || "inactive";
+    const statusB = courseStatus[courseB] || "inactive";
+    
+    const previousState = { ...courseStatus };
+    setCourseStatus(prev => ({
+      ...prev,
+      [courseA]: statusB,
+      [courseB]: statusA,
+    }));
+    
+    setMoveHistory(prev => [...prev, {
+      action: "swap",
+      courses: [courseA, courseB],
+      previousState
+    }]);
+    
+    setSelectedCourses(new Set());
+    setSuccessMsg(`Swapped status of ${courseA} and ${courseB}`);
+    setTimeout(() => setSuccessMsg(""), 2000);
+  };
+
+  // Export plan as image (simulation - would need html2canvas in production)
+  const exportAsImage = () => {
+    setSuccessMsg("Plan exported! (Feature in development - use browser screenshot for now)");
+    setTimeout(() => setSuccessMsg(""), 3000);
+  };
+
+  // Export to calendar (ICS format simulation)
+  const exportToCalendar = () => {
+    const activeCourses = allCourses.filter(c => c.status === "taking");
+    if (activeCourses.length === 0) {
+      setErrorMsg("No active courses to export");
+      setTimeout(() => setErrorMsg(""), 2000);
+      return;
+    }
+    
+    let icsContent = `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Builders Progress//EN
+`;
+    
+    activeCourses.forEach(course => {
+      const eventId = `${course.id}-${Date.now()}`;
+      icsContent += `BEGIN:VEVENT
+UID:${eventId}
+SUMMARY:${course.id} - ${course.title}
+DESCRIPTION:Units: ${course.units}
+STATUS:CONFIRMED
+END:VEVENT
+`;
+    });
+    
+    icsContent += `END:VCALENDAR`;
+    
+    const blob = new Blob([icsContent], { type: "text/calendar" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "course-schedule.ics";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    setSuccessMsg("Calendar exported successfully!");
+    setTimeout(() => setSuccessMsg(""), 2000);
+  };
+
+  return (
+    <>
+      {/* Hero */}
+      <div className={`${t.heroBg} text-white pb-8 pt-10 px-6 shadow-xl`}>
+        <div className="max-w-6xl mx-auto">
+          <div className="flex items-center gap-3 mb-2">
+            <Calendar className={`w-8 h-8 ${t.heroAccent}`} />
+            <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
+              Graduation Planner
+            </h1>
+          </div>
+          <p className={`${t.heroText} opacity-90 text-sm md:text-base`}>
+            Plan your path to graduation with smart scheduling, priorities, and conflict detection.
+          </p>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className={`${t.bodyBg} flex-1`}>
+        <div className="max-w-6xl mx-auto px-4 py-6">
+          {/* Toolbar */}
+          <div className={`${t.cardBg} rounded-xl p-4 mb-6 shadow-sm border ${t.cardBorder}`}>
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              {/* View Mode */}
+              <div className="flex items-center gap-2">
+                <div className={`flex items-center gap-1 ${t.secondaryBg} rounded-lg p-1`}>
+                  <button
+                    onClick={() => setPlanView("timeline")}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition flex items-center gap-1 ${
+                      planView === "timeline"
+                        ? `${t.primaryBtn} ${t.primaryBtnText}`
+                        : `${t.textSecondary} hover:${t.textPrimary}`
+                    }`}
+                  >
+                    <LayoutGrid className="w-3.5 h-3.5" />
+                    Timeline
+                  </button>
+                  <button
+                    onClick={() => setPlanView("table")}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition flex items-center gap-1 ${
+                      planView === "table"
+                        ? `${t.primaryBtn} ${t.primaryBtnText}`
+                        : `${t.textSecondary} hover:${t.textPrimary}`
+                    }`}
+                  >
+                    <Table className="w-3.5 h-3.5" />
+                    Table
+                  </button>
+                  <button
+                    onClick={() => setPlanView("compact")}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition flex items-center gap-1 ${
+                      planView === "compact"
+                        ? `${t.primaryBtn} ${t.primaryBtnText}`
+                        : `${t.textSecondary} hover:${t.textPrimary}`
+                    }`}
+                  >
+                    <Layers className="w-3.5 h-3.5" />
+                    Compact
+                  </button>
+                </div>
+
+                {/* Group By */}
+                <select
+                  value={groupBy}
+                  onChange={(e) => setGroupBy(e.target.value)}
+                  className={`px-3 py-1.5 rounded-lg text-xs border ${t.cardBorder} ${t.cardBg} ${t.textSecondary}`}
+                >
+                  <option value="term">Group by Term</option>
+                  <option value="year">Group by Year</option>
+                  <option value="department">Group by Department</option>
+                </select>
+              </div>
+
+              {/* Search */}
+              <div className="relative flex-1 max-w-xs">
+                <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${t.textMuted}`} />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search courses..."
+                  className={`w-full pl-9 pr-4 py-1.5 rounded-lg text-xs border ${t.cardBorder} ${t.cardBg} ${t.textPrimary}`}
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleUndo}
+                  disabled={moveHistory.length === 0}
+                  className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border ${t.cardBorder} ${t.textSecondary} hover:${t.textPrimary} transition disabled:opacity-50`}
+                >
+                  <Undo2 className="w-3.5 h-3.5" />
+                  Undo
+                </button>
+                <button
+                  onClick={exportAsImage}
+                  className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border ${t.cardBorder} ${t.textSecondary} hover:${t.textPrimary} transition`}
+                >
+                  <Image className="w-3.5 h-3.5" />
+                  Export Image
+                </button>
+                <button
+                  onClick={exportToCalendar}
+                  className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border ${t.cardBorder} ${t.textSecondary} hover:${t.textPrimary} transition`}
+                >
+                  <Calendar className="w-3.5 h-3.5" />
+                  Export Calendar
+                </button>
+              </div>
+            </div>
+
+            {/* Bulk Actions */}
+            {selectedCourses.size > 0 && (
+              <div className={`mt-4 pt-4 border-t ${t.cardBorder} flex items-center gap-4`}>
+                <span className={`text-sm ${t.textSecondary}`}>
+                  {selectedCourses.size} course(s) selected
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => moveSelectedToStatus("taking")}
+                    className={`px-3 py-1 rounded-lg text-xs font-medium bg-blue-100 text-blue-700 hover:bg-blue-200 transition`}
+                  >
+                    Mark Active
+                  </button>
+                  <button
+                    onClick={() => moveSelectedToStatus("passed")}
+                    className={`px-3 py-1 rounded-lg text-xs font-medium bg-green-100 text-green-700 hover:bg-green-200 transition`}
+                  >
+                    Mark Passed
+                  </button>
+                  <button
+                    onClick={() => moveSelectedToStatus("inactive")}
+                    className={`px-3 py-1 rounded-lg text-xs font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 transition`}
+                  >
+                    Mark Inactive
+                  </button>
+                  {selectedCourses.size === 2 && (
+                    <button
+                      onClick={swapCourseStatus}
+                      className={`px-3 py-1 rounded-lg text-xs font-medium bg-purple-100 text-purple-700 hover:bg-purple-200 transition flex items-center gap-1`}
+                    >
+                      <ArrowLeftRight className="w-3.5 h-3.5" />
+                      Swap Status
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setSelectedCourses(new Set())}
+                    className={`px-3 py-1 rounded-lg text-xs font-medium ${t.textMuted} hover:${t.textSecondary}`}
+                  >
+                    Clear Selection
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Plan View */}
+          {planView === "table" ? (
+            /* Table View */
+            <div className={`${t.cardBg} rounded-xl shadow-sm border ${t.cardBorder} overflow-hidden`}>
+              <div className="overflow-x-auto">
+                <table className={`w-full text-xs ${t.textPrimary}`}>
+                  <thead className={`${t.secondaryBg} border-b ${t.cardBorder}`}>
+                    <tr>
+                      <th className="w-8 px-3 py-3">
+                        <input
+                          type="checkbox"
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedCourses(new Set(filteredCourses.map(c => c.id)));
+                            } else {
+                              setSelectedCourses(new Set());
+                            }
+                          }}
+                          checked={selectedCourses.size === filteredCourses.length && filteredCourses.length > 0}
+                        />
+                      </th>
+                      <th className="text-left px-3 py-3 font-semibold">Code</th>
+                      <th className="text-left px-3 py-3 font-semibold">Title</th>
+                      <th className="text-center px-3 py-3 font-semibold">Units</th>
+                      <th className="text-center px-3 py-3 font-semibold">Year</th>
+                      <th className="text-center px-3 py-3 font-semibold">Term</th>
+                      <th className="text-center px-3 py-3 font-semibold">Status</th>
+                      <th className="text-center px-3 py-3 font-semibold">Priority</th>
+                      <th className="text-center px-3 py-3 font-semibold">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredCourses.map((course) => (
+                      <tr 
+                        key={course.id} 
+                        className={`border-b ${t.cardBorder} hover:${t.secondaryBg} ${
+                          selectedCourses.has(course.id) ? t.highlightBg : ''
+                        } ${course.status === 'passed' ? t.passedBg : ''}`}
+                      >
+                        <td className="px-3 py-2">
+                          <input
+                            type="checkbox"
+                            checked={selectedCourses.has(course.id)}
+                            onChange={() => toggleCourseSelection(course.id)}
+                          />
+                        </td>
+                        <td className="px-3 py-2 font-mono font-semibold">{course.id}</td>
+                        <td className="px-3 py-2">{course.title}</td>
+                        <td className="px-3 py-2 text-center">{course.units}</td>
+                        <td className="px-3 py-2 text-center">{course.yearName}</td>
+                        <td className="px-3 py-2 text-center">{course.termName}</td>
+                        <td className="px-3 py-2 text-center">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                            course.status === 'passed' ? t.passedBadge :
+                            course.status === 'taking' ? t.takingBadge :
+                            `${t.secondaryBg} ${t.textMuted}`
+                          }`}>
+                            {course.status === 'passed' ? 'Passed' : course.status === 'taking' ? 'Active' : 'Inactive'}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <button
+                            onClick={() => setShowPriorityModal(course.id)}
+                            className={`text-xs ${coursePriorities[course.id] ? 'text-orange-600' : t.textMuted}`}
+                          >
+                            {coursePriorities[course.id] || 'Normal'}
+                          </button>
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <button
+                            onClick={() => toggleLock(course.id)}
+                            className={`p-1 rounded ${lockedCourses[course.id] ? 'text-red-500' : t.textMuted} hover:opacity-70`}
+                            title={lockedCourses[course.id] ? "Unlock from term" : "Lock to term"}
+                          >
+                            <Lock className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : planView === "compact" ? (
+            /* Compact View */
+            <div className="space-y-4">
+              {CURRICULUM_DATA.map((year, yIdx) => (
+                <div key={yIdx} className={`${t.cardBg} rounded-xl shadow-sm border ${t.cardBorder} p-4`}>
+                  <h3 className={`font-semibold ${t.textPrimary} mb-3`}>{year.year}</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {year.terms.flatMap(term => term.courses).map(course => {
+                      const status = courseStatus[course.id] || "inactive";
+                      return (
+                        <button
+                          key={course.id}
+                          onClick={() => toggleCourseSelection(course.id)}
+                          className={`px-2 py-1 rounded-lg text-[10px] font-medium border transition ${
+                            selectedCourses.has(course.id) 
+                              ? 'ring-2 ring-blue-500' 
+                              : ''
+                          } ${
+                            status === 'passed' 
+                              ? `${t.passedBg} ${t.passedBorder}` 
+                              : status === 'taking'
+                              ? 'bg-blue-50 border-blue-200'
+                              : `${t.secondaryBg} ${t.cardBorder}`
+                          }`}
+                        >
+                          {course.id}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            /* Timeline View (default) */
+            <div className="grid md:grid-cols-4 gap-4">
+              {CURRICULUM_DATA.map((year, yIdx) => (
+                <div key={yIdx} className="space-y-3">
+                  <h3 className={`font-semibold ${t.textPrimary} text-center`}>{year.year}</h3>
+                  {year.terms.map((term, tIdx) => {
+                    const termCourses = term.courses.filter(c => 
+                      !searchQuery || 
+                      c.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      c.title.toLowerCase().includes(searchQuery.toLowerCase())
+                    );
+                    
+                    return (
+                      <div key={tIdx} className={`${t.cardBg} rounded-xl shadow-sm border ${t.cardBorder} p-3`}>
+                        <div className={`text-xs font-semibold ${t.textSecondary} mb-2 uppercase tracking-wide`}>
+                          {term.termName}
+                        </div>
+                        <div className="space-y-1.5">
+                          {termCourses.map(course => {
+                            const status = courseStatus[course.id] || "inactive";
+                            const isSelected = selectedCourses.has(course.id);
+                            const isLocked = !!lockedCourses[course.id];
+                            const priority = coursePriorities[course.id];
+                            
+                            return (
+                              <div
+                                key={course.id}
+                                onClick={() => toggleCourseSelection(course.id)}
+                                className={`p-2 rounded-lg border cursor-pointer transition ${
+                                  isSelected ? 'ring-2 ring-blue-500' : ''
+                                } ${
+                                  status === 'passed' 
+                                    ? `${t.passedBg} ${t.passedBorder}` 
+                                    : status === 'taking'
+                                    ? 'bg-blue-50 border-blue-200'
+                                    : `${t.secondaryBg} ${t.cardBorder} hover:border-slate-300`
+                                }`}
+                              >
+                                <div className="flex items-start justify-between gap-1">
+                                  <div className="min-w-0">
+                                    <div className={`text-[10px] font-mono font-bold ${t.textSecondary}`}>
+                                      {course.id}
+                                    </div>
+                                    <div className={`text-[10px] ${t.textPrimary} truncate`}>
+                                      {course.title}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-1 flex-shrink-0">
+                                    {priority && (
+                                      <span className="text-[8px] px-1 py-0.5 rounded bg-orange-100 text-orange-600">
+                                        {priority}
+                                      </span>
+                                    )}
+                                    {isLocked && (
+                                      <Lock className="w-3 h-3 text-red-500" />
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Unscheduled Courses Floating Card */}
+          {showUnscheduled && unscheduledCourses.length > 0 && (
+            <div className={`fixed bottom-6 right-6 ${t.cardBg} rounded-xl shadow-2xl border ${t.cardBorder} p-4 max-w-sm z-30`}>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Inbox className={`w-4 h-4 ${t.accentText}`} />
+                  <span className={`text-sm font-semibold ${t.textPrimary}`}>
+                    Unscheduled ({unscheduledCourses.length})
+                  </span>
+                </div>
+                <button
+                  onClick={() => setShowUnscheduled(false)}
+                  className={`${t.textMuted} hover:${t.textSecondary}`}
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="max-h-48 overflow-y-auto space-y-1">
+                {unscheduledCourses.slice(0, 10).map(course => (
+                  <div
+                    key={course.id}
+                    className={`p-2 rounded-lg ${t.secondaryBg} text-xs`}
+                  >
+                    <span className="font-mono font-semibold">{course.id}</span>
+                    <span className={`${t.textMuted} ml-2`}>{course.units}u</span>
+                  </div>
+                ))}
+                {unscheduledCourses.length > 10 && (
+                  <div className={`text-xs ${t.textMuted} text-center pt-1`}>
+                    +{unscheduledCourses.length - 10} more
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Show Unscheduled button when hidden */}
+          {!showUnscheduled && unscheduledCourses.length > 0 && (
+            <button
+              onClick={() => setShowUnscheduled(true)}
+              className={`fixed bottom-6 right-6 ${t.primaryBtn} ${t.primaryBtnText} px-4 py-2 rounded-xl shadow-lg flex items-center gap-2 z-30`}
+            >
+              <Inbox className="w-4 h-4" />
+              Unscheduled ({unscheduledCourses.length})
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Priority Modal */}
+      {showPriorityModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className={`${t.cardBg} rounded-2xl shadow-2xl max-w-xs w-full p-6`}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className={`text-sm font-semibold ${t.textPrimary}`}>Set Priority</h3>
+              <button
+                onClick={() => setShowPriorityModal(null)}
+                className={`${t.textMuted} hover:${t.textSecondary}`}
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="space-y-2">
+              {['High', 'Normal', 'Low'].map(p => (
+                <button
+                  key={p}
+                  onClick={() => setPriority(showPriorityModal, p === 'Normal' ? null : p)}
+                  className={`w-full p-3 rounded-lg text-sm text-left transition ${
+                    (coursePriorities[showPriorityModal] || 'Normal') === p
+                      ? `${t.primaryBtn} ${t.primaryBtnText}`
+                      : `${t.secondaryBg} ${t.textSecondary} hover:opacity-80`
+                  }`}
+                >
+                  {p} Priority
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
+
+// ---------------- SCHEDULE MAKER PAGE ----------------
+const ScheduleMakerPage = ({ 
+  theme, 
+  courseStatus,
+  setSuccessMsg,
+  setErrorMsg,
+}) => {
+  const t = THEMES[theme];
+  const [selectedSections, setSelectedSections] = useState([]);
+  const [groupBy, setGroupBy] = useState("course"); // "course" | "department" | "room" | "section"
+  const [searchQuery, setSearchQuery] = useState("");
+  const [viewMode, setViewMode] = useState("table"); // "table" | "card"
+
+  // Mock schedule data - in production, this would come from the student portal
+  const mockSections = useMemo(() => {
+    const sections = [];
+    const days = ["M", "T", "W", "Th", "F", "S"];
+    const dayPairs = [["M", "W"], ["T", "Th"], ["M", "Th"], ["T", "F"], ["W", "F"], ["M", "F"]];
+    const times = ["7:00 AM", "8:30 AM", "10:00 AM", "11:30 AM", "1:00 PM", "2:30 PM", "4:00 PM"];
+    const rooms = ["R301", "R302", "R303", "R401", "R402", "LAB1", "LAB2"];
+    const instructorNames = [
+      "Prof. Santos", "Prof. Cruz", "Prof. Reyes", "Prof. Garcia", "Prof. Mendoza",
+      "Prof. Torres", "Prof. Flores", "Prof. Rivera", "Prof. Gonzales", "Prof. Ramos",
+      "Engr. Dela Cruz", "Engr. Villanueva", "Engr. Bautista", "Engr. Aquino", "Engr. Fernandez"
+    ];
+    
+    CURRICULUM_DATA.forEach(year => {
+      year.terms.forEach(term => {
+        term.courses.forEach(course => {
+          const status = courseStatus[course.id] || "inactive";
+          if (status !== "passed") {
+            // Generate 2-3 mock sections per course
+            const numSections = Math.floor(Math.random() * 2) + 2;
+            for (let i = 0; i < numSections; i++) {
+              const sectionLetter = String.fromCharCode(65 + i);
+              const dayPair = dayPairs[Math.floor(Math.random() * dayPairs.length)];
+              const time = times[Math.floor(Math.random() * times.length)];
+              const room = rooms[Math.floor(Math.random() * rooms.length)];
+              const instructor = instructorNames[Math.floor(Math.random() * instructorNames.length)];
+              
+              sections.push({
+                id: `${course.id}-${sectionLetter}`,
+                courseId: course.id,
+                courseTitle: course.title,
+                section: sectionLetter,
+                units: course.units,
+                schedule: `${dayPair[0]}/${dayPair[1]} ${time}`,
+                room: room,
+                instructor: instructor,
+                slots: Math.floor(Math.random() * 40) + 5,
+                department: course.id.startsWith("CE") ? "CE" : course.id.startsWith("COE") ? "COE" : "GED",
+              });
+            }
+          }
+        });
+      });
+    });
+    
+    return sections;
+  }, [courseStatus]);
+
+  // Filter sections
+  const filteredSections = useMemo(() => {
+    if (!searchQuery) return mockSections;
+    const query = searchQuery.toLowerCase();
+    return mockSections.filter(s =>
+      s.courseId.toLowerCase().includes(query) ||
+      s.courseTitle.toLowerCase().includes(query) ||
+      s.section.toLowerCase().includes(query) ||
+      s.room.toLowerCase().includes(query) ||
+      s.schedule.toLowerCase().includes(query)
+    );
+  }, [mockSections, searchQuery]);
+
+  // Group sections
+  const groupedSections = useMemo(() => {
+    const groups = {};
+    filteredSections.forEach(section => {
+      let key;
+      switch (groupBy) {
+        case "department":
+          key = section.department;
+          break;
+        case "room":
+          key = section.room;
+          break;
+        case "section":
+          key = section.section;
+          break;
+        default:
+          key = `${section.courseId} – ${section.courseTitle}`;
+      }
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(section);
+    });
+    return groups;
+  }, [filteredSections, groupBy]);
+
+  // Add section to schedule
+  const addToSchedule = (section) => {
+    // Check for time conflicts
+    const conflict = selectedSections.find(s => 
+      s.schedule === section.schedule && s.id !== section.id
+    );
+    
+    if (conflict) {
+      setErrorMsg(`Schedule conflict with ${conflict.courseId} Section ${conflict.section}`);
+      setTimeout(() => setErrorMsg(""), 3000);
+      return;
+    }
+    
+    // Check if course already added
+    const existing = selectedSections.find(s => s.courseId === section.courseId);
+    if (existing) {
+      setErrorMsg(`${section.courseId} is already in your schedule`);
+      setTimeout(() => setErrorMsg(""), 3000);
+      return;
+    }
+
+    // Check credit limit warning
+    const newTotalUnits = totalUnits + section.units;
+    if (newTotalUnits > 21) {
+      setErrorMsg(`Warning: Adding this course will put you at ${newTotalUnits} units (over typical 21 unit limit)`);
+      setTimeout(() => setErrorMsg(""), 4000);
+    }
+
+    // Check prerequisite status
+    const courseData = CURRICULUM_DATA.flatMap(y => y.terms.flatMap(t => t.courses)).find(c => c.id === section.courseId);
+    if (courseData && courseData.prereqs.length > 0) {
+      const unmetPrereqs = courseData.prereqs.filter(prereqId => courseStatus[prereqId] !== "passed");
+      if (unmetPrereqs.length > 0) {
+        setErrorMsg(`Warning: Prerequisites not met: ${unmetPrereqs.join(", ")}`);
+        setTimeout(() => setErrorMsg(""), 4000);
+      }
+    }
+    
+    setSelectedSections(prev => [...prev, section]);
+    setSuccessMsg(`Added ${section.courseId} Section ${section.section} to schedule`);
+    setTimeout(() => setSuccessMsg(""), 2000);
+  };
+
+  // Remove section from schedule
+  const removeFromSchedule = (sectionId) => {
+    setSelectedSections(prev => prev.filter(s => s.id !== sectionId));
+  };
+
+  // Calculate total units
+  const totalUnits = selectedSections.reduce((acc, s) => acc + s.units, 0);
+
+  // Check for warnings
+  const getScheduleWarnings = () => {
+    const warnings = [];
+    
+    if (totalUnits > 21) {
+      warnings.push({ type: "credit", message: `Credit limit exceeded: ${totalUnits} units (typical max: 21)` });
+    }
+    
+    // Check for prerequisite issues
+    selectedSections.forEach(section => {
+      const courseData = CURRICULUM_DATA.flatMap(y => y.terms.flatMap(t => t.courses)).find(c => c.id === section.courseId);
+      if (courseData && courseData.prereqs.length > 0) {
+        const unmetPrereqs = courseData.prereqs.filter(prereqId => courseStatus[prereqId] !== "passed");
+        if (unmetPrereqs.length > 0) {
+          warnings.push({ 
+            type: "prereq", 
+            message: `${section.courseId}: Missing prerequisites (${unmetPrereqs.join(", ")})` 
+          });
+        }
+      }
+    });
+
+    // Check for petition-required courses
+    selectedSections.forEach(section => {
+      if (isPetitionRequired(section.courseId)) {
+        warnings.push({
+          type: "petition",
+          message: `${section.courseId}: May require petition for enrollment`
+        });
+      }
+    });
+    
+    return warnings;
+  };
+
+  const scheduleWarnings = getScheduleWarnings();
+
+  // Export schedule as image
+  const exportScheduleImage = () => {
+    setSuccessMsg("Schedule exported! (Use browser screenshot for now)");
+    setTimeout(() => setSuccessMsg(""), 3000);
+  };
+
+  return (
+    <>
+      {/* Hero */}
+      <div className={`${t.heroBg} text-white pb-8 pt-10 px-6 shadow-xl`}>
+        <div className="max-w-6xl mx-auto">
+          <div className="flex items-center gap-3 mb-2">
+            <Table className={`w-8 h-8 ${t.heroAccent}`} />
+            <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
+              Schedule Maker
+            </h1>
+          </div>
+          <p className={`${t.heroText} opacity-90 text-sm md:text-base`}>
+            Build your mock enrolment schedule. Select sections and check for conflicts.
+          </p>
+          <p className={`text-xs ${t.heroText} opacity-70 mt-2`}>
+            Data source: <a href={STUDENT_PORTAL_URL} target="_blank" rel="noopener noreferrer" className="underline">solar.feutech.edu.ph/course/offerings</a>
+          </p>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className={`${t.bodyBg} flex-1`}>
+        <div className="max-w-6xl mx-auto px-4 py-6">
+          {/* Warnings Panel */}
+          {scheduleWarnings.length > 0 && (
+            <div className={`mb-6 ${t.cardBg} rounded-xl border border-orange-300 p-4`}>
+              <div className="flex items-center gap-2 mb-3">
+                <AlertTriangle className="w-5 h-5 text-orange-500" />
+                <h3 className={`font-semibold ${t.textPrimary}`}>Schedule Warnings</h3>
+              </div>
+              <div className="space-y-2">
+                {scheduleWarnings.map((warning, idx) => (
+                  <div key={idx} className="flex items-start gap-2 text-sm">
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${
+                      warning.type === "credit" ? "bg-red-100 text-red-700" :
+                      warning.type === "prereq" ? "bg-orange-100 text-orange-700" :
+                      "bg-amber-100 text-amber-700"
+                    }`}>
+                      {warning.type === "credit" ? "Credit" : 
+                       warning.type === "prereq" ? "Prereq" : "Petition"}
+                    </span>
+                    <span className={t.textSecondary}>{warning.message}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Summary Stats */}
+          <div className="grid md:grid-cols-3 gap-4 mb-6">
+            <div className={`${t.cardBg} rounded-xl p-4 border ${t.cardBorder}`}>
+              <div className={`text-xs ${t.textMuted} uppercase tracking-wide`}>Selected Courses</div>
+              <div className={`text-2xl font-bold ${t.textPrimary}`}>{selectedSections.length}</div>
+            </div>
+            <div className={`${t.cardBg} rounded-xl p-4 border ${t.cardBorder}`}>
+              <div className={`text-xs ${t.textMuted} uppercase tracking-wide`}>Total Units</div>
+              <div className={`text-2xl font-bold ${t.textPrimary}`}>{totalUnits}</div>
+              {totalUnits > 21 && (
+                <div className="text-xs text-orange-600 mt-1">⚠️ Over typical limit</div>
+              )}
+            </div>
+            <div className={`${t.cardBg} rounded-xl p-4 border ${t.cardBorder}`}>
+              <div className={`text-xs ${t.textMuted} uppercase tracking-wide`}>Available Sections</div>
+              <div className={`text-2xl font-bold ${t.textPrimary}`}>{filteredSections.length}</div>
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6">
+            {/* Selected Schedule */}
+            <div className={`${t.cardBg} rounded-xl border ${t.cardBorder} p-4`}>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className={`font-semibold ${t.textPrimary} flex items-center gap-2`}>
+                  <Calendar className={`w-4 h-4 ${t.accentText}`} />
+                  My Schedule
+                </h2>
+                <button
+                  onClick={exportScheduleImage}
+                  className={`text-xs ${t.textSecondary} hover:${t.textPrimary} flex items-center gap-1`}
+                >
+                  <Image className="w-3.5 h-3.5" />
+                  Export
+                </button>
+              </div>
+              
+              {selectedSections.length === 0 ? (
+                <div className={`text-sm ${t.textMuted} text-center py-8`}>
+                  No courses selected yet. Browse available sections and add them to your schedule.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {selectedSections.map(section => (
+                    <div key={section.id} className={`p-3 rounded-lg ${t.secondaryBg} border ${t.cardBorder}`}>
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <div className={`text-xs font-mono font-bold ${t.textPrimary}`}>
+                            {section.courseId} – {section.section}
+                          </div>
+                          <div className={`text-[10px] ${t.textSecondary} mt-0.5`}>
+                            {section.courseTitle}
+                          </div>
+                          <div className={`text-[10px] ${t.textMuted} mt-1`}>
+                            {section.schedule} • {section.room}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => removeFromSchedule(section.id)}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Available Sections */}
+            <div className="md:col-span-2">
+              {/* Toolbar */}
+              <div className={`${t.cardBg} rounded-xl border ${t.cardBorder} p-4 mb-4`}>
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  {/* Search */}
+                  <div className="relative flex-1 max-w-xs">
+                    <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${t.textMuted}`} />
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search courses, rooms, times..."
+                      className={`w-full pl-9 pr-4 py-2 rounded-lg text-sm border ${t.cardBorder} ${t.cardBg} ${t.textPrimary}`}
+                    />
+                  </div>
+
+                  {/* Group By */}
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs ${t.textMuted}`}>Group by:</span>
+                    <div className={`flex items-center gap-1 ${t.secondaryBg} rounded-lg p-1`}>
+                      <button
+                        onClick={() => setGroupBy("course")}
+                        className={`px-2 py-1 rounded text-xs transition ${groupBy === "course" ? `${t.primaryBtn} ${t.primaryBtnText}` : `${t.textSecondary}`}`}
+                      >
+                        <Code className="w-3 h-3 inline mr-1" />
+                        Course
+                      </button>
+                      <button
+                        onClick={() => setGroupBy("department")}
+                        className={`px-2 py-1 rounded text-xs transition ${groupBy === "department" ? `${t.primaryBtn} ${t.primaryBtnText}` : `${t.textSecondary}`}`}
+                      >
+                        <Building2 className="w-3 h-3 inline mr-1" />
+                        Dept
+                      </button>
+                      <button
+                        onClick={() => setGroupBy("room")}
+                        className={`px-2 py-1 rounded text-xs transition ${groupBy === "room" ? `${t.primaryBtn} ${t.primaryBtnText}` : `${t.textSecondary}`}`}
+                      >
+                        <MapPin className="w-3 h-3 inline mr-1" />
+                        Room
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* View Mode */}
+                  <div className={`flex items-center gap-1 ${t.secondaryBg} rounded-lg p-1`}>
+                    <button
+                      onClick={() => setViewMode("table")}
+                      className={`px-2 py-1 rounded text-xs transition ${viewMode === "table" ? `${t.primaryBtn} ${t.primaryBtnText}` : `${t.textSecondary}`}`}
+                    >
+                      <Table className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => setViewMode("card")}
+                      className={`px-2 py-1 rounded text-xs transition ${viewMode === "card" ? `${t.primaryBtn} ${t.primaryBtnText}` : `${t.textSecondary}`}`}
+                    >
+                      <LayoutGrid className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Filter Summary */}
+                <div className={`text-xs ${t.textMuted} mt-3`}>
+                  Showing {filteredSections.length} section{filteredSections.length !== 1 ? 's' : ''} 
+                  in {Object.keys(groupedSections).length} group{Object.keys(groupedSections).length !== 1 ? 's' : ''}
+                </div>
+              </div>
+
+              {/* Sections List */}
+              <div className={`${t.cardBg} rounded-xl border ${t.cardBorder} overflow-hidden`}>
+                {Object.entries(groupedSections).map(([groupName, sections]) => (
+                  <div key={groupName} className={`border-b ${t.cardBorder} last:border-b-0`}>
+                    <div className={`px-4 py-2 ${t.secondaryBg} font-semibold text-sm ${t.textPrimary}`}>
+                      {groupName}
+                    </div>
+                    
+                    {viewMode === "table" ? (
+                      <table className="w-full text-xs">
+                        <thead className={`${t.secondaryBg}`}>
+                          <tr>
+                            <th className="px-4 py-2 text-left font-medium">Section</th>
+                            <th className="px-4 py-2 text-left font-medium">Schedule</th>
+                            <th className="px-4 py-2 text-left font-medium">Room</th>
+                            <th className="px-4 py-2 text-center font-medium">Units</th>
+                            <th className="px-4 py-2 text-center font-medium">Slots</th>
+                            <th className="px-4 py-2 text-center font-medium">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {sections.map(section => {
+                            const isSelected = selectedSections.some(s => s.id === section.id);
+                            const hasConflict = selectedSections.some(s => 
+                              s.schedule === section.schedule && s.id !== section.id
+                            );
+                            
+                            return (
+                              <tr key={section.id} className={`border-t ${t.cardBorder} ${isSelected ? t.passedBg : ''}`}>
+                                <td className={`px-4 py-2 font-mono ${t.textPrimary}`}>
+                                  {section.courseId}-{section.section}
+                                </td>
+                                <td className={`px-4 py-2 ${t.textSecondary}`}>{section.schedule}</td>
+                                <td className={`px-4 py-2 ${t.textSecondary}`}>{section.room}</td>
+                                <td className={`px-4 py-2 text-center ${t.textSecondary}`}>{section.units}</td>
+                                <td className={`px-4 py-2 text-center ${t.textSecondary}`}>{section.slots}</td>
+                                <td className="px-4 py-2 text-center">
+                                  {isSelected ? (
+                                    <button
+                                      onClick={() => removeFromSchedule(section.id)}
+                                      className="text-red-500 text-xs"
+                                    >
+                                      Remove
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={() => addToSchedule(section)}
+                                      className={`text-xs ${hasConflict ? 'text-orange-500' : t.accentText}`}
+                                    >
+                                      {hasConflict ? '⚠️ Add' : 'Add'}
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <div className="p-4 grid md:grid-cols-2 gap-3">
+                        {sections.map(section => {
+                          const isSelected = selectedSections.some(s => s.id === section.id);
+                          
+                          return (
+                            <div
+                              key={section.id}
+                              className={`p-3 rounded-lg border ${isSelected ? `${t.passedBg} ${t.passedBorder}` : `${t.secondaryBg} ${t.cardBorder}`}`}
+                            >
+                              <div className="flex items-start justify-between">
+                                <div>
+                                  <div className={`text-xs font-mono font-bold ${t.textPrimary}`}>
+                                    {section.courseId}-{section.section}
+                                  </div>
+                                  <div className={`text-[10px] ${t.textSecondary}`}>{section.schedule}</div>
+                                  <div className={`text-[10px] ${t.textMuted}`}>{section.room} • {section.units}u • {section.slots} slots</div>
+                                </div>
+                                {isSelected ? (
+                                  <button
+                                    onClick={() => removeFromSchedule(section.id)}
+                                    className="text-red-500"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => addToSchedule(section)}
+                                    className={`${t.primaryBtn} ${t.primaryBtnText} text-xs px-2 py-1 rounded`}
+                                  >
+                                    Add
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ))}
+                
+                {Object.keys(groupedSections).length === 0 && (
+                  <div className={`p-8 text-center ${t.textMuted}`}>
+                    No sections found matching your search.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+};
+
 // ---------------- ROOT APP WITH PAGE SWITCHER ----------------
 const App = () => {
   const [courseStatus, setCourseStatus] = useState({});
   const [courseGPA, setCourseGPA] = useState({});
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
-  const [activePage, setActivePage] = useState("tracker"); // "tracker" | "gpa" | "visualizer"
+  const [activePage, setActivePage] = useState("home"); // "home" | "tracker" | "gpa" | "visualizer" | "planner" | "schedule"
   const [theme, setTheme] = useState("feuGreen"); // "feuGreen" | "acesTheme" | "dark" | "highContrast"
   const [viewMode, setViewMode] = useState("card"); // "card" | "list"
   const [showWhatCanITake, setShowWhatCanITake] = useState(false);
@@ -2825,53 +4521,92 @@ const App = () => {
       {/* Top navigation to switch pages */}
       <header className={`w-full ${t.headerBg} border-b ${t.headerBorder} sticky top-0 z-40`}>
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <button 
+            onClick={() => setActivePage("home")}
+            className="flex items-center gap-2 hover:opacity-80 transition"
+          >
             <GraduationCap className={`w-5 h-5 ${t.accentText}`} />
             <span className={`font-semibold ${t.textPrimary} text-sm md:text-base`}>
-              BSCE Academic Tools
+              Builders Progress
             </span>
-          </div>
-          <nav className="flex items-center gap-2 text-xs md:text-sm">
+          </button>
+          <nav className="flex items-center gap-1 md:gap-2 text-xs md:text-sm overflow-x-auto">
+            <button
+              type="button"
+              onClick={() => setActivePage("home")}
+              className={`inline-flex items-center gap-1 px-2 md:px-3 py-1.5 rounded-full border text-xs md:text-sm transition ${
+                activePage === "home"
+                  ? t.navActive
+                  : `${t.cardBg} ${t.textSecondary} ${t.cardBorder} hover:opacity-80`
+              }`}
+            >
+              <Home className="w-4 h-4" />
+              <span className="hidden md:inline">Home</span>
+            </button>
             <button
               type="button"
               onClick={() => setActivePage("tracker")}
-              className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full border text-xs md:text-sm transition ${
+              className={`inline-flex items-center gap-1 px-2 md:px-3 py-1.5 rounded-full border text-xs md:text-sm transition ${
                 activePage === "tracker"
                   ? t.navActive
                   : `${t.cardBg} ${t.textSecondary} ${t.cardBorder} hover:opacity-80`
               }`}
             >
               <LayoutTemplate className="w-4 h-4" />
-              Curriculum Tracker
+              <span className="hidden md:inline">Tracker</span>
             </button>
             <button
               type="button"
               onClick={() => setActivePage("gpa")}
-              className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full border text-xs md:text-sm transition ${
+              className={`inline-flex items-center gap-1 px-2 md:px-3 py-1.5 rounded-full border text-xs md:text-sm transition ${
                 activePage === "gpa"
                   ? t.navActive
                   : `${t.cardBg} ${t.textSecondary} ${t.cardBorder} hover:opacity-80`
               }`}
             >
               <Calculator className="w-4 h-4" />
-              GPA Calculator
+              <span className="hidden md:inline">GPA</span>
             </button>
             <button
               type="button"
               onClick={() => setActivePage("visualizer")}
-              className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full border text-xs md:text-sm transition ${
+              className={`inline-flex items-center gap-1 px-2 md:px-3 py-1.5 rounded-full border text-xs md:text-sm transition ${
                 activePage === "visualizer"
                   ? t.navActive
                   : `${t.cardBg} ${t.textSecondary} ${t.cardBorder} hover:opacity-80`
               }`}
             >
               <Link2 className="w-4 h-4" />
-              Chain Visualizer
+              <span className="hidden md:inline">Visualizer</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActivePage("planner")}
+              className={`inline-flex items-center gap-1 px-2 md:px-3 py-1.5 rounded-full border text-xs md:text-sm transition ${
+                activePage === "planner"
+                  ? t.navActive
+                  : `${t.cardBg} ${t.textSecondary} ${t.cardBorder} hover:opacity-80`
+              }`}
+            >
+              <Calendar className="w-4 h-4" />
+              <span className="hidden md:inline">Planner</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActivePage("schedule")}
+              className={`inline-flex items-center gap-1 px-2 md:px-3 py-1.5 rounded-full border text-xs md:text-sm transition ${
+                activePage === "schedule"
+                  ? t.navActive
+                  : `${t.cardBg} ${t.textSecondary} ${t.cardBorder} hover:opacity-80`
+              }`}
+            >
+              <Table className="w-4 h-4" />
+              <span className="hidden md:inline">Schedule</span>
             </button>
             <button
               type="button"
               onClick={() => setShowThemeModal(true)}
-              className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full border text-xs md:text-sm transition ${t.cardBg} ${t.textSecondary} ${t.cardBorder} hover:opacity-80`}
+              className={`inline-flex items-center gap-1 px-2 md:px-3 py-1.5 rounded-full border text-xs md:text-sm transition ${t.cardBg} ${t.textSecondary} ${t.cardBorder} hover:opacity-80`}
             >
               <Palette className="w-4 h-4" />
             </button>
@@ -2879,6 +4614,32 @@ const App = () => {
         </div>
       </header>
 
+      {/* Success/Error Messages */}
+      {errorMsg && (
+        <div className={`fixed top-20 left-1/2 transform -translate-x-1/2 ${t.cardBg} border-l-4 border-red-500 ${t.textPrimary} px-6 py-4 rounded-xl shadow-2xl z-50 flex items-center max-w-md`}>
+          <AlertCircle className="w-5 h-5 mr-3 text-red-500 flex-shrink-0" />
+          <span className="font-medium text-sm">{errorMsg}</span>
+        </div>
+      )}
+
+      {successMsg && (
+        <div className={`fixed top-20 left-1/2 transform -translate-x-1/2 ${t.cardBg} border-l-4 border-green-500 ${t.textPrimary} px-6 py-4 rounded-xl shadow-2xl z-50 flex items-center max-w-md`}>
+          <Check className="w-5 h-5 mr-3 text-green-500 flex-shrink-0" />
+          <span className="font-medium text-sm">{successMsg}</span>
+        </div>
+      )}
+
+      {activePage === "home" && (
+        <MenuLandingPage
+          theme={theme}
+          setActivePage={setActivePage}
+          courseStatus={courseStatus}
+          yearEnteredCollege={yearEnteredCollege}
+          setYearEnteredCollege={setYearEnteredCollege}
+          setSuccessMsg={setSuccessMsg}
+          setErrorMsg={setErrorMsg}
+        />
+      )}
       {activePage === "tracker" && (
         <CurriculumTrackerPage
           courseStatus={courseStatus}
@@ -2913,6 +4674,24 @@ const App = () => {
         <ChainVisualizerPage
           theme={theme}
           courseStatus={courseStatus}
+        />
+      )}
+      {activePage === "planner" && (
+        <GraduationPlannerPage
+          theme={theme}
+          courseStatus={courseStatus}
+          setCourseStatus={setCourseStatus}
+          setSuccessMsg={setSuccessMsg}
+          setErrorMsg={setErrorMsg}
+          onConfetti={triggerConfetti}
+        />
+      )}
+      {activePage === "schedule" && (
+        <ScheduleMakerPage
+          theme={theme}
+          courseStatus={courseStatus}
+          setSuccessMsg={setSuccessMsg}
+          setErrorMsg={setErrorMsg}
         />
       )}
     </div>
