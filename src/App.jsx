@@ -55,7 +55,7 @@ import { SpeedInsights } from "@vercel/speed-insights/react";
 import Confetti from "react-confetti";
 
 // Configuration constants
-const STUDENT_PORTAL_URL = "https://solar.feutech.edu.ph/course/offerings";
+const STUDENT_PORTAL_URL = "https://solar.feutech.edu.ph";
 
 // --- DATA: Full Civil Engineering Curriculum (FEU Tech BSCE) ---
 const CURRICULUM_DATA = [
@@ -4518,7 +4518,7 @@ const ScheduleMakerPage = ({
                   <pre className={`text-xs ${t.textMuted} overflow-x-auto`}>
 {`[
   {
-    "course": "COE0001 - Engineering Math 1",
+    "course": "COE0001",
     "section": "A",
     "classSize": 40,
     "remaining": 15,
