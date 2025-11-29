@@ -3153,26 +3153,14 @@ const MenuLandingPage = ({
             {features.map((feature) => (
               <button
                 key={feature.id}
-                onClick={() => feature.id !== "schedule" && setActivePage(feature.id)}
-                disabled={feature.id === "schedule"}
-                className={`${t.cardBg} rounded-xl p-5 border ${t.cardBorder} ${feature.id === "schedule" ? "opacity-60 cursor-not-allowed" : `${t.cardHover} hover:shadow-xl cursor-pointer`} transition-all duration-300 text-left group w-full sm:w-64 relative`}
+                onClick={() => setActivePage(feature.id)}
+                className={`${t.cardBg} rounded-xl p-5 border ${t.cardBorder} ${t.cardHover} hover:shadow-xl cursor-pointer transition-all duration-300 text-left group w-full sm:w-64 relative`}
               >
-                {feature.id === "schedule" && (
-                  <div className="absolute -top-2 -right-2 bg-amber-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md">
-                    Coming Soon
-                  </div>
-                )}
-                <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${feature.color} flex items-center justify-center mb-3 ${feature.id !== "schedule" ? "group-hover:scale-110" : ""} transition-transform`}>
+                <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${feature.color} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
                   <feature.icon className="w-5 h-5 text-white" />
                 </div>
                 <h3 className={`font-semibold ${t.textPrimary} mb-1 text-sm`}>{feature.title}</h3>
                 <p className={`text-xs ${t.textSecondary}`}>{feature.description}</p>
-                {feature.id === "schedule" && (
-                  <div className={`mt-2 flex items-center gap-1 text-amber-600`}>
-                    <AlertTriangle className="w-3 h-3" />
-                    <span className="text-[10px] font-medium">Under Development</span>
-                  </div>
-                )}
               </button>
             ))}
           </div>
