@@ -323,6 +323,36 @@ const THEMES = {
     highlightBg: "bg-yellow-100",
     hoverHighlightBg: "bg-blue-50",
   },
+  feuGold: {
+    name: "FEU Gold",
+    heroGradient: "from-feugold-6 via-feugold-5 to-feugold-4",
+    heroBg: "bg-feugold-5",
+    heroText: "text-feugold-1",
+    heroAccent: "text-feugold-2",
+    headerBg: "bg-white",
+    headerBorder: "border-feugold-3",
+    cardBg: "bg-white",
+    cardBorder: "border-feugold-2",
+    cardHover: "hover:border-feugold-4",
+    primaryBtn: "bg-feugold-4 hover:bg-feugold-5 border-feugold-4",
+    primaryBtnText: "text-white",
+    accentBg: "bg-feugold-1",
+    accentBorder: "border-feugold-3",
+    accentText: "text-feugold-6",
+    secondaryBg: "bg-feugold-1",
+    textPrimary: "text-slate-800",
+    textSecondary: "text-slate-600",
+    textMuted: "text-slate-400",
+    bodyBg: "bg-feugold-1",
+    passedBg: "bg-green-50",
+    passedBorder: "border-green-300",
+    passedBadge: "bg-green-100 text-green-700",
+    takingBadge: "bg-feugold-4 text-white",
+    progressBar: "from-feugold-4 to-feugold-3",
+    navActive: "bg-feugold-4 text-white border-feugold-4",
+    highlightBg: "bg-yellow-100",
+    hoverHighlightBg: "bg-feugold-1",
+  },
   acesTheme: {
     name: "ACES Theme",
     heroGradient: "from-aces-5 via-aces-4 to-aces-3",
@@ -4736,6 +4766,7 @@ const App = () => {
                     <div className={`font-medium ${theme === key ? '' : t.textPrimary}`}>{themeData.name}</div>
                     <div className={`text-xs ${theme === key ? 'opacity-70' : t.textMuted}`}>
                       {key === "feuGreen" && "School colors theme"}
+                      {key === "feuGold" && "FEU Gold color palette"}
                       {key === "acesTheme" && "ACES blue color palette"}
                       {key === "dark" && "For late-night study sessions"}
                       {key === "highContrast" && "Accessibility-focused"}
