@@ -3199,9 +3199,11 @@ const MenuLandingPage = ({
               const yearRemainingUnits = yearUnits - yearPassedUnits;
 
               // Calculate the gauge arc
-              const gaugeRadius = 45;
+              // The path goes from (10, 60) to (110, 60) = 100px horizontal distance
+              // For a proper semi-circle, radius should be half of that = 50
+              const gaugeRadius = 50;
               const gaugeStrokeWidth = 8;
-              const gaugeCircumference = Math.PI * gaugeRadius; // Semi-circle
+              const gaugeCircumference = Math.PI * gaugeRadius; // Semi-circle arc length = π * r
               const gaugeFillLength = (yearPercent / 100) * gaugeCircumference;
 
               return (
@@ -3213,7 +3215,7 @@ const MenuLandingPage = ({
                     <svg width="120" height="70" viewBox="0 0 120 70">
                       {/* Background arc */}
                       <path
-                        d="M 10 60 A 45 45 0 0 1 110 60"
+                        d="M 10 60 A 50 50 0 0 1 110 60"
                         fill="none"
                         stroke={theme === 'dark' || theme === 'highContrast' ? '#374151' : '#e5e7eb'}
                         strokeWidth={gaugeStrokeWidth}
@@ -3221,7 +3223,7 @@ const MenuLandingPage = ({
                       />
                       {/* Progress arc */}
                       <path
-                        d="M 10 60 A 45 45 0 0 1 110 60"
+                        d="M 10 60 A 50 50 0 0 1 110 60"
                         fill="none"
                         stroke={theme === 'feuGreen' ? '#22c55e' : theme === 'acesTheme' ? '#3b82f6' : theme === 'dark' ? '#3b82f6' : '#facc15'}
                         strokeWidth={gaugeStrokeWidth}
