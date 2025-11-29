@@ -4856,13 +4856,15 @@ const App = () => {
             </button>
             <button
               type="button"
-              disabled
-              title="Coming Soon - Under Development"
-              className={`inline-flex items-center gap-1 px-2 md:px-3 py-1.5 rounded-full border text-xs md:text-sm transition ${t.cardBg} ${t.textMuted} ${t.cardBorder} opacity-50 cursor-not-allowed relative`}
+              onClick={() => setActivePage("schedule")}
+              className={`inline-flex items-center gap-1 px-2 md:px-3 py-1.5 rounded-full border text-xs md:text-sm transition ${
+                activePage === "schedule"
+                  ? t.navActive
+                  : `${t.cardBg} ${t.textSecondary} ${t.cardBorder} hover:opacity-80`
+              }`}
             >
               <Table className="w-4 h-4" />
               <span className="hidden md:inline">Schedule</span>
-              <span className="absolute -top-1 -right-1 w-2 h-2 bg-amber-500 rounded-full"></span>
             </button>
             <button
               type="button"
