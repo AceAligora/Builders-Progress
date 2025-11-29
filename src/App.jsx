@@ -14,7 +14,6 @@ import {
   Calculator,
   LayoutTemplate,
   RotateCcw,
-  List,
   LayoutGrid,
   Palette,
   Filter,
@@ -1093,18 +1092,7 @@ const CurriculumTrackerPage = ({
                   <LayoutGrid className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">Card</span>
                 </button>
-                <button
-                  onClick={() => setViewMode("list")}
-                  className={`px-2 py-1.5 rounded-md text-xs font-medium transition flex items-center gap-1 ${
-                    viewMode === "list"
-                      ? `${t.primaryBtn} ${t.primaryBtnText}`
-                      : `${t.textSecondary} hover:${t.textPrimary}`
-                  }`}
-                  title="List View"
-                >
-                  <List className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">List</span>
-                </button>
+
                 <button
                   onClick={() => setViewMode("timeline")}
                   className={`px-2 py-1.5 rounded-md text-xs font-medium transition flex items-center gap-1 ${
@@ -1436,94 +1424,6 @@ const CurriculumTrackerPage = ({
                             </div>
                           </div>
                         ))}
-                      </div>
-                    )}
-                    
-                    {/* List View */}
-                    {viewMode === "list" && (
-                      <div className="overflow-x-auto">
-                        <table className={`w-full text-xs ${t.textPrimary}`}>
-                          <thead>
-                            <tr className={`border-b ${t.cardBorder}`}>
-                              <th className="text-left py-2 px-2 font-semibold">Code</th>
-                              <th className="text-left py-2 px-2 font-semibold">Title</th>
-                              <th className="text-center py-2 px-2 font-semibold">Units</th>
-                              <th className="text-center py-2 px-2 font-semibold">Term</th>
-                              <th className="text-center py-2 px-2 font-semibold">Status</th>
-                              <th className="text-center py-2 px-2 font-semibold">Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {filteredTerms.flatMap((term, tIdx) =>
-                              term.courses.map((course) => {
-                                const status = courseStatus[course.id] || "inactive";
-                                const autoSyncedLab = isAutoSyncedLabId(course.id);
-                                const locked = isLocked(course);
-                                const isHighlighted = highlightedCourses.has(course.id);
-                                const isHovered = hoveredCourse === course.id;
-
-                                return (
-                                  <tr 
-                                    key={course.id} 
-                                    className={`border-b ${t.cardBorder} ${
-                                      isHighlighted ? t.highlightBg : 
-                                      isHovered ? t.hoverHighlightBg : ''
-                                    } ${status === 'passed' ? t.passedBg : ''}`}
-                                    onMouseEnter={() => setHoveredCourse(course.id)}
-                                    onMouseLeave={() => setHoveredCourse(null)}
-                                  >
-                                    <td className="py-2 px-2 font-mono">
-                                      {course.id}
-                                      {isPetitionRequired(course.id) && (
-                                        <span className="ml-1 text-[10px] bg-amber-500 text-white px-1 rounded" title="Petition may be required">P</span>
-                                      )}
-                                    </td>
-                                    <td className="py-2 px-2">{course.title}</td>
-                                    <td className="py-2 px-2 text-center">{course.units}</td>
-                                    <td className="py-2 px-2 text-center">{term.termName}</td>
-                                    <td className="py-2 px-2 text-center">
-                                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                                        status === 'passed' ? t.passedBadge :
-                                        status === 'taking' ? t.takingBadge :
-                                        `${t.secondaryBg} ${t.textMuted}`
-                                      }`}>
-                                        {status === 'passed' ? 'Passed' : status === 'taking' ? 'Active' : 'Inactive'}
-                                      </span>
-                                    </td>
-                                    <td className="py-2 px-2 text-center">
-                                      {autoSyncedLab ? (
-                                        <span className={`text-[10px] ${t.textMuted}`}>Auto-sync</span>
-                                      ) : (
-                                        <div className="flex gap-1 justify-center">
-                                          <button
-                                            onClick={() => setCourseStatusWithValidation(course.id, "inactive", locked, status)}
-                                            className={`px-1.5 py-0.5 rounded text-[9px] ${status === 'inactive' ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
-                                          >
-                                            I
-                                          </button>
-                                          <button
-                                            onClick={() => setCourseStatusWithValidation(course.id, "taking", locked, status)}
-                                            disabled={locked}
-                                            className={`px-1.5 py-0.5 rounded text-[9px] ${status === 'taking' ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'} ${locked ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                          >
-                                            A
-                                          </button>
-                                          <button
-                                            onClick={() => setCourseStatusWithValidation(course.id, "passed", locked, status)}
-                                            disabled={locked}
-                                            className={`px-1.5 py-0.5 rounded text-[9px] ${status === 'passed' ? 'bg-green-600 text-white' : 'bg-green-100 text-green-700 hover:bg-green-200'} ${locked ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                          >
-                                            P
-                                          </button>
-                                        </div>
-                                      )}
-                                    </td>
-                                  </tr>
-                                );
-                              })
-                            )}
-                          </tbody>
-                        </table>
                       </div>
                     )}
                     
@@ -4694,7 +4594,7 @@ const App = () => {
   const [successMsg, setSuccessMsg] = useState("");
   const [activePage, setActivePage] = useState("home"); // "home" | "tracker" | "gpa" | "visualizer" | "planner" | "schedule"
   const [theme, setTheme] = useState("feuGreen"); // "feuGreen" | "acesTheme" | "dark" | "highContrast"
-  const [viewMode, setViewMode] = useState("card"); // "card" | "list"
+  const [viewMode, setViewMode] = useState("card"); // "card" | "timeline" | "table" | "compact"
   const [showWhatCanITake, setShowWhatCanITake] = useState(false);
   const [hoveredCourse, setHoveredCourse] = useState(null);
   const [yearEnteredCollege, setYearEnteredCollege] = useState("");
