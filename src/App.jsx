@@ -3037,23 +3037,30 @@ const MenuLandingPage = ({
       }
     });
 
-    // Calculate how many terms remain
-    const remainingTerms = maxDelayedTermNumber + 1;
+    // Constants for degree structure
+    const STANDARD_DEGREE_YEARS = 4;
+    const TERMS_PER_YEAR = 3;
+    const STANDARD_TOTAL_TERMS = STANDARD_DEGREE_YEARS * TERMS_PER_YEAR; // 12 terms for standard 4-year degree
     
-    // Calculate graduation based on remaining terms (standard is 12 terms = 4 years)
-    const standardTerms = 12;
-    const delayTerms = Math.max(0, remainingTerms - standardTerms + (12 - incompleteCourses.length > 0 ? 0 : 1));
+    // Calculate remaining terms and graduation timing
+    const lastIncompleteTermNumber = maxDelayedTermNumber + 1;
     
-    // Graduation year = entry year + ceiling of (last incomplete term + 1) / 3
-    const yearsFromStart = Math.ceil((maxDelayedTermNumber + 1) / 3);
+    // Calculate years from start based on the last incomplete term
+    // Divide by terms per year and round up to get total years needed
+    const yearsFromStart = Math.ceil(lastIncompleteTermNumber / TERMS_PER_YEAR);
     const graduationYear = entryYear + yearsFromStart;
-    const termInYear = (maxDelayedTermNumber % 3);
+    
+    // Determine which term within the final year
+    const termInYear = (maxDelayedTermNumber % TERMS_PER_YEAR);
     const termNames = ["1st Term", "2nd Term", "3rd Term"];
+    
+    // Calculate delay: difference between actual years and standard degree duration
+    const delayInYears = Math.max(0, yearsFromStart - STANDARD_DEGREE_YEARS);
     
     return { 
       year: graduationYear, 
       term: termNames[termInYear],
-      delayTerms: Math.max(0, yearsFromStart - 4),
+      delayTerms: delayInYears,
       incompleteCourses: incompleteCourses.length,
     };
   };
@@ -4225,6 +4232,13 @@ const ScheduleMakerPage = ({
 
   const scheduleWarnings = getScheduleWarnings();
 
+  // Constants for ICS export
+  const DEFAULT_CLASS_DURATION_MINUTES = 90; // Standard 1.5 hour class duration
+  const WEEKS_IN_SEMESTER = 16; // Standard semester length
+  
+  // Day abbreviation to offset mapping (0 = Monday)
+  const DAY_ABBREVIATION_MAP = { 'M': 0, 'T': 1, 'W': 2, 'Th': 3, 'F': 4, 'S': 5 };
+
   // Export schedule as ICS (iCalendar format)
   const exportScheduleICS = () => {
     if (selectedSections.length === 0) {
@@ -4268,17 +4282,14 @@ const ScheduleMakerPage = ({
         if (timeMatch[3].toUpperCase() === 'AM' && hours === 12) hours = 0;
       }
 
-      // Map day abbreviations to day offsets from Monday (0)
-      const dayMap = { 'M': 0, 'T': 1, 'W': 2, 'Th': 3, 'F': 4, 'S': 5 };
-      
       days.forEach(day => {
-        const dayOffset = dayMap[day] || 0;
+        const dayOffset = DAY_ABBREVIATION_MAP[day] || 0;
         const eventDate = new Date(nextMonday);
         eventDate.setDate(nextMonday.getDate() + dayOffset);
         eventDate.setHours(hours, minutes, 0, 0);
         
         const endDate = new Date(eventDate);
-        endDate.setMinutes(endDate.getMinutes() + 90); // 1.5 hour class
+        endDate.setMinutes(endDate.getMinutes() + DEFAULT_CLASS_DURATION_MINUTES);
 
         const uid = `${section.id}-${day}-${Date.now()}-${idx}@builders-progress`;
         
@@ -4291,7 +4302,7 @@ const ScheduleMakerPage = ({
           `SUMMARY:${section.courseId} - ${section.section}`,
           `DESCRIPTION:${section.courseTitle}\\nInstructor: ${section.instructor}\\nUnits: ${section.units}`,
           `LOCATION:${section.room}`,
-          'RRULE:FREQ=WEEKLY;COUNT=16',
+          `RRULE:FREQ=WEEKLY;COUNT=${WEEKS_IN_SEMESTER}`,
           'STATUS:CONFIRMED',
           'END:VEVENT',
         ].join('\r\n') + '\r\n';
