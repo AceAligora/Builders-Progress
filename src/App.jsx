@@ -14,7 +14,6 @@ import {
   Calculator,
   LayoutTemplate,
   RotateCcw,
-  List,
   LayoutGrid,
   Palette,
   Filter,
@@ -323,6 +322,36 @@ const THEMES = {
     navActive: "bg-green-600 text-white border-green-600",
     highlightBg: "bg-yellow-100",
     hoverHighlightBg: "bg-blue-50",
+  },
+  feuGold: {
+    name: "FEU Gold",
+    heroGradient: "from-feugold-6 via-feugold-5 to-feugold-4",
+    heroBg: "bg-feugold-5",
+    heroText: "text-feugold-1",
+    heroAccent: "text-feugold-2",
+    headerBg: "bg-white",
+    headerBorder: "border-feugold-3",
+    cardBg: "bg-white",
+    cardBorder: "border-feugold-2",
+    cardHover: "hover:border-feugold-4",
+    primaryBtn: "bg-feugold-4 hover:bg-feugold-5 border-feugold-4",
+    primaryBtnText: "text-white",
+    accentBg: "bg-feugold-1",
+    accentBorder: "border-feugold-3",
+    accentText: "text-feugold-6",
+    secondaryBg: "bg-feugold-1",
+    textPrimary: "text-slate-800",
+    textSecondary: "text-slate-600",
+    textMuted: "text-slate-400",
+    bodyBg: "bg-feugold-1",
+    passedBg: "bg-green-50",
+    passedBorder: "border-green-300",
+    passedBadge: "bg-green-100 text-green-700",
+    takingBadge: "bg-feugold-4 text-white",
+    progressBar: "from-feugold-4 to-feugold-3",
+    navActive: "bg-feugold-4 text-white border-feugold-4",
+    highlightBg: "bg-yellow-100",
+    hoverHighlightBg: "bg-feugold-1",
   },
   acesTheme: {
     name: "ACES Theme",
@@ -1093,18 +1122,7 @@ const CurriculumTrackerPage = ({
                   <LayoutGrid className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">Card</span>
                 </button>
-                <button
-                  onClick={() => setViewMode("list")}
-                  className={`px-2 py-1.5 rounded-md text-xs font-medium transition flex items-center gap-1 ${
-                    viewMode === "list"
-                      ? `${t.primaryBtn} ${t.primaryBtnText}`
-                      : `${t.textSecondary} hover:${t.textPrimary}`
-                  }`}
-                  title="List View"
-                >
-                  <List className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">List</span>
-                </button>
+
                 <button
                   onClick={() => setViewMode("timeline")}
                   className={`px-2 py-1.5 rounded-md text-xs font-medium transition flex items-center gap-1 ${
@@ -1436,94 +1454,6 @@ const CurriculumTrackerPage = ({
                             </div>
                           </div>
                         ))}
-                      </div>
-                    )}
-                    
-                    {/* List View */}
-                    {viewMode === "list" && (
-                      <div className="overflow-x-auto">
-                        <table className={`w-full text-xs ${t.textPrimary}`}>
-                          <thead>
-                            <tr className={`border-b ${t.cardBorder}`}>
-                              <th className="text-left py-2 px-2 font-semibold">Code</th>
-                              <th className="text-left py-2 px-2 font-semibold">Title</th>
-                              <th className="text-center py-2 px-2 font-semibold">Units</th>
-                              <th className="text-center py-2 px-2 font-semibold">Term</th>
-                              <th className="text-center py-2 px-2 font-semibold">Status</th>
-                              <th className="text-center py-2 px-2 font-semibold">Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {filteredTerms.flatMap((term, tIdx) =>
-                              term.courses.map((course) => {
-                                const status = courseStatus[course.id] || "inactive";
-                                const autoSyncedLab = isAutoSyncedLabId(course.id);
-                                const locked = isLocked(course);
-                                const isHighlighted = highlightedCourses.has(course.id);
-                                const isHovered = hoveredCourse === course.id;
-
-                                return (
-                                  <tr 
-                                    key={course.id} 
-                                    className={`border-b ${t.cardBorder} ${
-                                      isHighlighted ? t.highlightBg : 
-                                      isHovered ? t.hoverHighlightBg : ''
-                                    } ${status === 'passed' ? t.passedBg : ''}`}
-                                    onMouseEnter={() => setHoveredCourse(course.id)}
-                                    onMouseLeave={() => setHoveredCourse(null)}
-                                  >
-                                    <td className="py-2 px-2 font-mono">
-                                      {course.id}
-                                      {isPetitionRequired(course.id) && (
-                                        <span className="ml-1 text-[10px] bg-amber-500 text-white px-1 rounded" title="Petition may be required">P</span>
-                                      )}
-                                    </td>
-                                    <td className="py-2 px-2">{course.title}</td>
-                                    <td className="py-2 px-2 text-center">{course.units}</td>
-                                    <td className="py-2 px-2 text-center">{term.termName}</td>
-                                    <td className="py-2 px-2 text-center">
-                                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                                        status === 'passed' ? t.passedBadge :
-                                        status === 'taking' ? t.takingBadge :
-                                        `${t.secondaryBg} ${t.textMuted}`
-                                      }`}>
-                                        {status === 'passed' ? 'Passed' : status === 'taking' ? 'Active' : 'Inactive'}
-                                      </span>
-                                    </td>
-                                    <td className="py-2 px-2 text-center">
-                                      {autoSyncedLab ? (
-                                        <span className={`text-[10px] ${t.textMuted}`}>Auto-sync</span>
-                                      ) : (
-                                        <div className="flex gap-1 justify-center">
-                                          <button
-                                            onClick={() => setCourseStatusWithValidation(course.id, "inactive", locked, status)}
-                                            className={`px-1.5 py-0.5 rounded text-[9px] ${status === 'inactive' ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
-                                          >
-                                            I
-                                          </button>
-                                          <button
-                                            onClick={() => setCourseStatusWithValidation(course.id, "taking", locked, status)}
-                                            disabled={locked}
-                                            className={`px-1.5 py-0.5 rounded text-[9px] ${status === 'taking' ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'} ${locked ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                          >
-                                            A
-                                          </button>
-                                          <button
-                                            onClick={() => setCourseStatusWithValidation(course.id, "passed", locked, status)}
-                                            disabled={locked}
-                                            className={`px-1.5 py-0.5 rounded text-[9px] ${status === 'passed' ? 'bg-green-600 text-white' : 'bg-green-100 text-green-700 hover:bg-green-200'} ${locked ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                          >
-                                            P
-                                          </button>
-                                        </div>
-                                      )}
-                                    </td>
-                                  </tr>
-                                );
-                              })
-                            )}
-                          </tbody>
-                        </table>
                       </div>
                     )}
                     
@@ -3219,18 +3149,30 @@ const MenuLandingPage = ({
             Academic Tools
           </h2>
           
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+          <div className="flex flex-wrap justify-center gap-4">
             {features.map((feature) => (
               <button
                 key={feature.id}
-                onClick={() => setActivePage(feature.id)}
-                className={`${t.cardBg} rounded-xl p-5 border ${t.cardBorder} ${t.cardHover} hover:shadow-xl transition-all duration-300 text-left group`}
+                onClick={() => feature.id !== "schedule" && setActivePage(feature.id)}
+                disabled={feature.id === "schedule"}
+                className={`${t.cardBg} rounded-xl p-5 border ${t.cardBorder} ${feature.id === "schedule" ? "opacity-60 cursor-not-allowed" : `${t.cardHover} hover:shadow-xl cursor-pointer`} transition-all duration-300 text-left group w-full sm:w-64 relative`}
               >
-                <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${feature.color} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
+                {feature.id === "schedule" && (
+                  <div className="absolute -top-2 -right-2 bg-amber-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md">
+                    Coming Soon
+                  </div>
+                )}
+                <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${feature.color} flex items-center justify-center mb-3 ${feature.id !== "schedule" ? "group-hover:scale-110" : ""} transition-transform`}>
                   <feature.icon className="w-5 h-5 text-white" />
                 </div>
                 <h3 className={`font-semibold ${t.textPrimary} mb-1 text-sm`}>{feature.title}</h3>
                 <p className={`text-xs ${t.textSecondary}`}>{feature.description}</p>
+                {feature.id === "schedule" && (
+                  <div className={`mt-2 flex items-center gap-1 text-amber-600`}>
+                    <AlertTriangle className="w-3 h-3" />
+                    <span className="text-[10px] font-medium">Under Development</span>
+                  </div>
+                )}
               </button>
             ))}
           </div>
@@ -4694,7 +4636,7 @@ const App = () => {
   const [successMsg, setSuccessMsg] = useState("");
   const [activePage, setActivePage] = useState("home"); // "home" | "tracker" | "gpa" | "visualizer" | "planner" | "schedule"
   const [theme, setTheme] = useState("feuGreen"); // "feuGreen" | "acesTheme" | "dark" | "highContrast"
-  const [viewMode, setViewMode] = useState("card"); // "card" | "list"
+  const [viewMode, setViewMode] = useState("card"); // "card" | "timeline" | "table" | "compact"
   const [showWhatCanITake, setShowWhatCanITake] = useState(false);
   const [hoveredCourse, setHoveredCourse] = useState(null);
   const [yearEnteredCollege, setYearEnteredCollege] = useState("");
@@ -4836,6 +4778,7 @@ const App = () => {
                     <div className={`font-medium ${theme === key ? '' : t.textPrimary}`}>{themeData.name}</div>
                     <div className={`text-xs ${theme === key ? 'opacity-70' : t.textMuted}`}>
                       {key === "feuGreen" && "School colors theme"}
+                      {key === "feuGold" && "FEU Gold color palette"}
                       {key === "acesTheme" && "ACES blue color palette"}
                       {key === "dark" && "For late-night study sessions"}
                       {key === "highContrast" && "Accessibility-focused"}
@@ -4911,15 +4854,13 @@ const App = () => {
             </button>
             <button
               type="button"
-              onClick={() => setActivePage("schedule")}
-              className={`inline-flex items-center gap-1 px-2 md:px-3 py-1.5 rounded-full border text-xs md:text-sm transition ${
-                activePage === "schedule"
-                  ? t.navActive
-                  : `${t.cardBg} ${t.textSecondary} ${t.cardBorder} hover:opacity-80`
-              }`}
+              disabled
+              title="Coming Soon - Under Development"
+              className={`inline-flex items-center gap-1 px-2 md:px-3 py-1.5 rounded-full border text-xs md:text-sm transition ${t.cardBg} ${t.textMuted} ${t.cardBorder} opacity-50 cursor-not-allowed relative`}
             >
               <Table className="w-4 h-4" />
               <span className="hidden md:inline">Schedule</span>
+              <span className="absolute -top-1 -right-1 w-2 h-2 bg-amber-500 rounded-full"></span>
             </button>
             <button
               type="button"
