@@ -3149,18 +3149,30 @@ const MenuLandingPage = ({
             Academic Tools
           </h2>
           
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+          <div className="flex flex-wrap justify-center gap-4">
             {features.map((feature) => (
               <button
                 key={feature.id}
-                onClick={() => setActivePage(feature.id)}
-                className={`${t.cardBg} rounded-xl p-5 border ${t.cardBorder} ${t.cardHover} hover:shadow-xl transition-all duration-300 text-left group`}
+                onClick={() => feature.id !== "schedule" && setActivePage(feature.id)}
+                disabled={feature.id === "schedule"}
+                className={`${t.cardBg} rounded-xl p-5 border ${t.cardBorder} ${feature.id === "schedule" ? "opacity-60 cursor-not-allowed" : `${t.cardHover} hover:shadow-xl cursor-pointer`} transition-all duration-300 text-left group w-full sm:w-64 relative`}
               >
-                <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${feature.color} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
+                {feature.id === "schedule" && (
+                  <div className="absolute -top-2 -right-2 bg-amber-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md">
+                    Coming Soon
+                  </div>
+                )}
+                <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${feature.color} flex items-center justify-center mb-3 ${feature.id !== "schedule" ? "group-hover:scale-110" : ""} transition-transform`}>
                   <feature.icon className="w-5 h-5 text-white" />
                 </div>
                 <h3 className={`font-semibold ${t.textPrimary} mb-1 text-sm`}>{feature.title}</h3>
                 <p className={`text-xs ${t.textSecondary}`}>{feature.description}</p>
+                {feature.id === "schedule" && (
+                  <div className={`mt-2 flex items-center gap-1 text-amber-600`}>
+                    <AlertTriangle className="w-3 h-3" />
+                    <span className="text-[10px] font-medium">Under Development</span>
+                  </div>
+                )}
               </button>
             ))}
           </div>
@@ -4842,15 +4854,13 @@ const App = () => {
             </button>
             <button
               type="button"
-              onClick={() => setActivePage("schedule")}
-              className={`inline-flex items-center gap-1 px-2 md:px-3 py-1.5 rounded-full border text-xs md:text-sm transition ${
-                activePage === "schedule"
-                  ? t.navActive
-                  : `${t.cardBg} ${t.textSecondary} ${t.cardBorder} hover:opacity-80`
-              }`}
+              disabled
+              title="Coming Soon - Under Development"
+              className={`inline-flex items-center gap-1 px-2 md:px-3 py-1.5 rounded-full border text-xs md:text-sm transition ${t.cardBg} ${t.textMuted} ${t.cardBorder} opacity-50 cursor-not-allowed relative`}
             >
               <Table className="w-4 h-4" />
               <span className="hidden md:inline">Schedule</span>
+              <span className="absolute -top-1 -right-1 w-2 h-2 bg-amber-500 rounded-full"></span>
             </button>
             <button
               type="button"
