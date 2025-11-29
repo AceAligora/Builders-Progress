@@ -14,7 +14,6 @@ import {
   Calculator,
   LayoutTemplate,
   RotateCcw,
-  List,
   LayoutGrid,
   Palette,
   Filter,
@@ -23,10 +22,37 @@ import {
   Target,
   AlertTriangle,
   Link2,
+  ZoomIn,
+  ZoomOut,
+  Home,
+  Clock,
+  FileText,
+  Settings,
+  Undo2,
+  History,
+  Move,
+  ArrowLeftRight,
+  Inbox,
+  Sparkles,
+  MessageSquare,
+  Info,
+  ChevronDown,
+  Image,
+  Table,
+  Layers,
+  Search,
+  Save,
+  Building2,
+  Users,
+  Code,
+  MapPin,
 } from "lucide-react";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 import Confetti from "react-confetti";
+
+// Configuration constants
+const STUDENT_PORTAL_URL = "https://solar.feutech.edu.ph/course/offerings";
 
 // --- DATA: Full Civil Engineering Curriculum (FEU Tech BSCE) ---
 const CURRICULUM_DATA = [
@@ -244,6 +270,25 @@ const isAutoSyncedLabId = (courseId) => {
 const getCoreqLectureId = (courseId) =>
   courseId.endsWith("L") ? courseId.slice(0, -1) : null;
 
+// Petition-required courses - courses that typically require petition for out-of-sequence taking
+// These include internship, projects, and specialized courses with multiple prerequisites
+const PETITION_REQUIRED_COURSES = new Set([
+  "CE0067", // Internship for CE
+  "CE0057", // CE Project 1
+  "CE0071", // CE Project 2
+  "CE0043", // Professional Course 1 – Earthquake Engineering
+  "CE0045", // Professional Course 2 – Reinforced Concrete Design
+  "CE0059", // Professional Course 3 – Design of Steel Structures
+  "CE0061", // Professional Course 4 – Prestressed Concrete Design
+  "CE0073", // Professional Course 5 – Foundation and Retaining Wall
+  "CE0075", // Professional Course 6 – Computer Software in Structural Analysis
+  "CE0077", // Technical Elective for CE - COSH
+  "CE0069", // CE Correlation Course 3
+]);
+
+// Check if a course requires petition for out-of-sequence enrollment
+const isPetitionRequired = (courseId) => PETITION_REQUIRED_COURSES.has(courseId);
+
 const isLabCourse = (course) => course.id.endsWith("L");
 
 // Theme configurations
@@ -277,6 +322,36 @@ const THEMES = {
     navActive: "bg-green-600 text-white border-green-600",
     highlightBg: "bg-yellow-100",
     hoverHighlightBg: "bg-blue-50",
+  },
+  feuGold: {
+    name: "FEU Gold",
+    heroGradient: "from-feugold-6 via-feugold-5 to-feugold-4",
+    heroBg: "bg-feugold-5",
+    heroText: "text-feugold-1",
+    heroAccent: "text-feugold-2",
+    headerBg: "bg-white",
+    headerBorder: "border-feugold-3",
+    cardBg: "bg-white",
+    cardBorder: "border-feugold-2",
+    cardHover: "hover:border-feugold-4",
+    primaryBtn: "bg-feugold-4 hover:bg-feugold-5 border-feugold-4",
+    primaryBtnText: "text-white",
+    accentBg: "bg-feugold-1",
+    accentBorder: "border-feugold-3",
+    accentText: "text-feugold-6",
+    secondaryBg: "bg-feugold-1",
+    textPrimary: "text-slate-800",
+    textSecondary: "text-slate-600",
+    textMuted: "text-slate-400",
+    bodyBg: "bg-feugold-1",
+    passedBg: "bg-green-50",
+    passedBorder: "border-green-300",
+    passedBadge: "bg-green-100 text-green-700",
+    takingBadge: "bg-feugold-4 text-white",
+    progressBar: "from-feugold-4 to-feugold-3",
+    navActive: "bg-feugold-4 text-white border-feugold-4",
+    highlightBg: "bg-yellow-100",
+    hoverHighlightBg: "bg-feugold-1",
   },
   acesTheme: {
     name: "ACES Theme",
@@ -448,40 +523,8 @@ const TERMS_PER_YEAR = 3;
 const TOTAL_PROGRAM_YEARS = 4;
 const TOTAL_TERMS = TERMS_PER_YEAR * TOTAL_PROGRAM_YEARS;
 
-const calculateTermsRemaining = (yearEnteredCollege) => {
-  if (!yearEnteredCollege) return null;
-  
-  const enteredYear = parseInt(yearEnteredCollege, 10);
-  if (isNaN(enteredYear)) return null;
-  
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth(); // 0-11
-  
-  // Estimate current term based on month (simplified: Aug-Nov=T1, Dec-Mar=T2, Apr-Jul=T3)
-  let currentTermInYear;
-  if (currentMonth >= 7 && currentMonth <= 10) {
-    currentTermInYear = 1; // Term 1 (Aug-Nov)
-  } else if (currentMonth >= 11 || currentMonth <= 2) {
-    currentTermInYear = 2; // Term 2 (Dec-Mar)
-  } else {
-    currentTermInYear = 3; // Term 3 (Apr-Jul)
-  }
-  
-  // Calculate years elapsed since entering college
-  const yearsElapsed = currentYear - enteredYear;
-  
-  // Calculate terms elapsed
-  const termsElapsed = (yearsElapsed * TERMS_PER_YEAR) + currentTermInYear;
-  
-  // Calculate remaining terms
-  const termsRemaining = Math.max(0, TOTAL_TERMS - termsElapsed + 1);
-  
-  return termsRemaining;
-};
-
 // Calculate delay terms when unmarking a course as passed
-const calculateDelayTerms = (courseId, yearEnteredCollege) => {
+const calculateDelayTerms = (courseId) => {
   // Get the course's scheduled term in the curriculum
   let courseYearIndex = -1;
   let courseTermIndex = -1;
@@ -550,8 +593,6 @@ const CurriculumTrackerPage = ({
   setShowWhatCanITake,
   hoveredCourse,
   setHoveredCourse,
-  yearEnteredCollege,
-  setYearEnteredCollege,
   courseGPA,
   onConfetti,
 }) => {
@@ -647,7 +688,7 @@ const CurriculumTrackerPage = ({
       if (dependents.length > 0) {
         const dependentTitles = dependents.slice(0, 3).map(id => getCourseTitle(id));
         const moreCount = dependents.length > 3 ? ` and ${dependents.length - 3} more` : "";
-        const delayTerms = calculateDelayTerms(courseId, yearEnteredCollege);
+        const delayTerms = calculateDelayTerms(courseId);
         setCriticalPathWarning({
           courseId,
           message: `Delay Warning: This will delay your graduation by at least ${delayTerms} term${delayTerms !== 1 ? 's' : ''} because it unlocks: ${dependentTitles.join(", ")}${moreCount}`,
@@ -925,9 +966,6 @@ const CurriculumTrackerPage = ({
   }
   const barWidth = percentage === 0 ? 0 : Math.max(4, percentage);
 
-  // Calculate terms remaining
-  const termsRemaining = calculateTermsRemaining(yearEnteredCollege);
-
   return (
     <>
       {/* HERO HEADER */}
@@ -943,13 +981,7 @@ const CurriculumTrackerPage = ({
             <p className={`${t.heroText} opacity-90 text-sm md:text-base`}>
               Civil Engineering • BSCE Curriculum (FEU Institute of Technology)
             </p>
-            {/* Graduation Countdown */}
-            {termsRemaining !== null && (
-              <div className={`mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full ${t.accentBg} ${t.accentText} text-sm font-medium`}>
-                <Calendar className="w-4 h-4" />
-                {termsRemaining === 0 ? "🎓 Graduation Time!" : `${termsRemaining} Term${termsRemaining !== 1 ? 's' : ''} to go!`}
-              </div>
-            )}
+
           </div>
 
           {/* Summary stats */}
@@ -1075,30 +1107,57 @@ const CurriculumTrackerPage = ({
 
           {/* TOOLBAR - View Toggle, What Can I Take */}
           <div className={`${t.cardBg} rounded-lg p-3 mb-4 shadow-md flex flex-wrap items-center justify-between gap-3`}>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               {/* View Mode Toggle */}
               <div className={`flex items-center gap-1 ${t.secondaryBg} rounded-lg p-1`}>
                 <button
                   onClick={() => setViewMode("card")}
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition flex items-center gap-1 ${
+                  className={`px-2 py-1.5 rounded-md text-xs font-medium transition flex items-center gap-1 ${
                     viewMode === "card"
                       ? `${t.primaryBtn} ${t.primaryBtnText}`
                       : `${t.textSecondary} hover:${t.textPrimary}`
                   }`}
+                  title="Card View"
                 >
                   <LayoutGrid className="w-3.5 h-3.5" />
-                  Card
+                  <span className="hidden sm:inline">Card</span>
                 </button>
+
                 <button
-                  onClick={() => setViewMode("list")}
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition flex items-center gap-1 ${
-                    viewMode === "list"
+                  onClick={() => setViewMode("timeline")}
+                  className={`px-2 py-1.5 rounded-md text-xs font-medium transition flex items-center gap-1 ${
+                    viewMode === "timeline"
                       ? `${t.primaryBtn} ${t.primaryBtnText}`
                       : `${t.textSecondary} hover:${t.textPrimary}`
                   }`}
+                  title="Timeline View"
                 >
-                  <List className="w-3.5 h-3.5" />
-                  List
+                  <Clock className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Timeline</span>
+                </button>
+                <button
+                  onClick={() => setViewMode("table")}
+                  className={`px-2 py-1.5 rounded-md text-xs font-medium transition flex items-center gap-1 ${
+                    viewMode === "table"
+                      ? `${t.primaryBtn} ${t.primaryBtnText}`
+                      : `${t.textSecondary} hover:${t.textPrimary}`
+                  }`}
+                  title="Table View"
+                >
+                  <Table className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Table</span>
+                </button>
+                <button
+                  onClick={() => setViewMode("compact")}
+                  className={`px-2 py-1.5 rounded-md text-xs font-medium transition flex items-center gap-1 ${
+                    viewMode === "compact"
+                      ? `${t.primaryBtn} ${t.primaryBtnText}`
+                      : `${t.textSecondary} hover:${t.textPrimary}`
+                  }`}
+                  title="Compact View"
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Compact</span>
                 </button>
               </div>
 
@@ -1116,22 +1175,34 @@ const CurriculumTrackerPage = ({
               </button>
             </div>
 
+            {/* Data Management Actions */}
             <div className="flex items-center gap-2">
-              {/* Year Entered College Input */}
-              <div className="flex items-center gap-1.5">
-                <Calendar className={`w-3.5 h-3.5 ${t.textMuted}`} />
-                <label className={`text-xs ${t.textSecondary}`}>Year Entered College:</label>
-                <input
-                  type="number"
-                  min="2000"
-                  max="2100"
-                  value={yearEnteredCollege}
-                  onChange={(e) => setYearEnteredCollege(e.target.value)}
-                  className={`w-20 px-2 py-1 rounded border ${t.cardBorder} ${t.cardBg} ${t.textPrimary} text-xs`}
-                  placeholder="e.g. 2022"
-                />
-              </div>
+              <button
+                onClick={exportToClipboard}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1 border ${t.cardBorder} ${t.textSecondary} hover:${t.textPrimary}`}
+                title="Copy progress to clipboard"
+              >
+                <Copy className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Copy</span>
+              </button>
+              <button
+                onClick={exportToFile}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1 border ${t.cardBorder} ${t.textSecondary} hover:${t.textPrimary}`}
+                title="Download backup file"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Export</span>
+              </button>
+              <button
+                onClick={() => setShowImportModal(true)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1 border ${t.cardBorder} ${t.textSecondary} hover:${t.textPrimary}`}
+                title="Import progress data"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Import</span>
+              </button>
             </div>
+
           </div>
 
           {/* PROGRESS BAR */}
@@ -1224,44 +1295,99 @@ const CurriculumTrackerPage = ({
 
                 {expandedYear === year.year && (
                   <div className="px-4 pb-4 pt-3">
-                    {/* List View */}
-                    {viewMode === "list" ? (
+                    {/* Timeline View */}
+                    {viewMode === "timeline" && (
+                      <div className="relative">
+                        {filteredTerms.map((term, tIdx) => (
+                          <div key={tIdx} className="mb-6 last:mb-0">
+                            <div className="flex items-center gap-3 mb-3">
+                              <div className={`w-3 h-3 rounded-full ${t.accentBg} border-2 ${t.accentBorder}`}></div>
+                              <h3 className={`font-semibold ${t.textSecondary} uppercase tracking-wide text-sm`}>{term.termName}</h3>
+                              <div className={`flex-1 h-px ${t.cardBorder}`}></div>
+                              <span className={`text-xs ${t.textMuted}`}>{term.courses.reduce((acc, c) => acc + c.units, 0)} units</span>
+                            </div>
+                            <div className="ml-6 border-l-2 border-dashed border-slate-200 pl-6 space-y-2">
+                              {term.courses.map((course) => {
+                                const status = courseStatus[course.id] || "inactive";
+                                const autoSyncedLab = isAutoSyncedLabId(course.id);
+                                const locked = isLocked(course);
+                                return (
+                                  <div 
+                                    key={course.id} 
+                                    className={`flex items-center justify-between p-2 rounded-lg border ${
+                                      status === 'passed' ? `${t.passedBg} ${t.passedBorder}` :
+                                      status === 'taking' ? 'bg-blue-50 border-blue-200' :
+                                      `${t.secondaryBg} ${t.cardBorder}`
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-3">
+                                      <span className={`text-xs font-mono font-semibold ${t.textPrimary}`}>{course.id}</span>
+                                      <span className={`text-xs ${t.textSecondary}`}>{course.title}</span>
+                                      <span className={`text-[10px] ${t.textMuted}`}>{course.units}u</span>
+                                    </div>
+                                    {!autoSyncedLab && (
+                                      <div className="flex gap-1">
+                                        <button
+                                          onClick={() => setCourseStatusWithValidation(course.id, "inactive", locked, status)}
+                                          className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] ${status === 'inactive' ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                                        >I</button>
+                                        <button
+                                          onClick={() => setCourseStatusWithValidation(course.id, "taking", locked, status)}
+                                          disabled={locked}
+                                          className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] ${status === 'taking' ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'} ${locked ? 'opacity-50' : ''}`}
+                                        >A</button>
+                                        <button
+                                          onClick={() => setCourseStatusWithValidation(course.id, "passed", locked, status)}
+                                          disabled={locked}
+                                          className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] ${status === 'passed' ? 'bg-green-600 text-white' : 'bg-green-100 text-green-700 hover:bg-green-200'} ${locked ? 'opacity-50' : ''}`}
+                                        >P</button>
+                                      </div>
+                                    )}
+                                    {autoSyncedLab && <span className={`text-[10px] ${t.textMuted}`}>Auto</span>}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* Table View (full table for entire year) */}
+                    {viewMode === "table" && (
                       <div className="overflow-x-auto">
                         <table className={`w-full text-xs ${t.textPrimary}`}>
                           <thead>
-                            <tr className={`border-b ${t.cardBorder}`}>
-                              <th className="text-left py-2 px-2 font-semibold">Code</th>
-                              <th className="text-left py-2 px-2 font-semibold">Title</th>
-                              <th className="text-center py-2 px-2 font-semibold">Units</th>
-                              <th className="text-center py-2 px-2 font-semibold">Term</th>
-                              <th className="text-center py-2 px-2 font-semibold">Status</th>
-                              <th className="text-center py-2 px-2 font-semibold">Actions</th>
+                            <tr className={`border-b ${t.cardBorder} ${t.secondaryBg}`}>
+                              <th className="text-left py-2 px-3 font-semibold">Code</th>
+                              <th className="text-left py-2 px-3 font-semibold">Title</th>
+                              <th className="text-center py-2 px-3 font-semibold">Units</th>
+                              <th className="text-center py-2 px-3 font-semibold">Term</th>
+                              <th className="text-left py-2 px-3 font-semibold">Prerequisites</th>
+                              <th className="text-center py-2 px-3 font-semibold">Status</th>
+                              <th className="text-center py-2 px-3 font-semibold">Actions</th>
                             </tr>
                           </thead>
                           <tbody>
-                            {filteredTerms.flatMap((term, tIdx) =>
+                            {filteredTerms.flatMap((term) =>
                               term.courses.map((course) => {
                                 const status = courseStatus[course.id] || "inactive";
                                 const autoSyncedLab = isAutoSyncedLabId(course.id);
                                 const locked = isLocked(course);
-                                const isHighlighted = highlightedCourses.has(course.id);
-                                const isHovered = hoveredCourse === course.id;
-
                                 return (
-                                  <tr 
-                                    key={course.id} 
-                                    className={`border-b ${t.cardBorder} ${
-                                      isHighlighted ? t.highlightBg : 
-                                      isHovered ? t.hoverHighlightBg : ''
-                                    } ${status === 'passed' ? t.passedBg : ''}`}
-                                    onMouseEnter={() => setHoveredCourse(course.id)}
-                                    onMouseLeave={() => setHoveredCourse(null)}
-                                  >
-                                    <td className="py-2 px-2 font-mono">{course.id}</td>
-                                    <td className="py-2 px-2">{course.title}</td>
-                                    <td className="py-2 px-2 text-center">{course.units}</td>
-                                    <td className="py-2 px-2 text-center">{term.termName}</td>
-                                    <td className="py-2 px-2 text-center">
+                                  <tr key={course.id} className={`border-b ${t.cardBorder} ${status === 'passed' ? t.passedBg : ''}`}>
+                                    <td className="py-2 px-3 font-mono font-semibold">{course.id}</td>
+                                    <td className="py-2 px-3">{course.title}</td>
+                                    <td className="py-2 px-3 text-center">{course.units}</td>
+                                    <td className="py-2 px-3 text-center">{term.termName}</td>
+                                    <td className="py-2 px-3">
+                                      {course.prereqs.length > 0 ? (
+                                        <span className={`text-[10px] ${t.textMuted}`}>{course.prereqs.join(", ")}</span>
+                                      ) : (
+                                        <span className={`text-[10px] ${t.textMuted}`}>None</span>
+                                      )}
+                                    </td>
+                                    <td className="py-2 px-3 text-center">
                                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
                                         status === 'passed' ? t.passedBadge :
                                         status === 'taking' ? t.takingBadge :
@@ -1270,31 +1396,14 @@ const CurriculumTrackerPage = ({
                                         {status === 'passed' ? 'Passed' : status === 'taking' ? 'Active' : 'Inactive'}
                                       </span>
                                     </td>
-                                    <td className="py-2 px-2 text-center">
+                                    <td className="py-2 px-3 text-center">
                                       {autoSyncedLab ? (
-                                        <span className={`text-[10px] ${t.textMuted}`}>Auto-sync</span>
+                                        <span className={`text-[10px] ${t.textMuted}`}>Auto</span>
                                       ) : (
                                         <div className="flex gap-1 justify-center">
-                                          <button
-                                            onClick={() => setCourseStatusWithValidation(course.id, "inactive", locked, status)}
-                                            className={`px-1.5 py-0.5 rounded text-[9px] ${status === 'inactive' ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
-                                          >
-                                            I
-                                          </button>
-                                          <button
-                                            onClick={() => setCourseStatusWithValidation(course.id, "taking", locked, status)}
-                                            disabled={locked}
-                                            className={`px-1.5 py-0.5 rounded text-[9px] ${status === 'taking' ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'} ${locked ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                          >
-                                            A
-                                          </button>
-                                          <button
-                                            onClick={() => setCourseStatusWithValidation(course.id, "passed", locked, status)}
-                                            disabled={locked}
-                                            className={`px-1.5 py-0.5 rounded text-[9px] ${status === 'passed' ? 'bg-green-600 text-white' : 'bg-green-100 text-green-700 hover:bg-green-200'} ${locked ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                          >
-                                            P
-                                          </button>
+                                          <button onClick={() => setCourseStatusWithValidation(course.id, "inactive", locked, status)} className={`px-1.5 py-0.5 rounded text-[9px] ${status === 'inactive' ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-600'}`}>I</button>
+                                          <button onClick={() => setCourseStatusWithValidation(course.id, "taking", locked, status)} disabled={locked} className={`px-1.5 py-0.5 rounded text-[9px] ${status === 'taking' ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-700'} ${locked ? 'opacity-50' : ''}`}>A</button>
+                                          <button onClick={() => setCourseStatusWithValidation(course.id, "passed", locked, status)} disabled={locked} className={`px-1.5 py-0.5 rounded text-[9px] ${status === 'passed' ? 'bg-green-600 text-white' : 'bg-green-100 text-green-700'} ${locked ? 'opacity-50' : ''}`}>P</button>
                                         </div>
                                       )}
                                     </td>
@@ -1305,8 +1414,51 @@ const CurriculumTrackerPage = ({
                           </tbody>
                         </table>
                       </div>
-                    ) : (
-                    /* Card View */
+                    )}
+                    
+                    {/* Compact View */}
+                    {viewMode === "compact" && (
+                      <div className="space-y-4">
+                        {filteredTerms.map((term, tIdx) => (
+                          <div key={tIdx}>
+                            <div className={`text-xs font-semibold ${t.textSecondary} mb-2 uppercase tracking-wide`}>
+                              {term.termName} ({term.courses.reduce((acc, c) => acc + c.units, 0)}u)
+                            </div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {term.courses.map((course) => {
+                                const status = courseStatus[course.id] || "inactive";
+                                const autoSyncedLab = isAutoSyncedLabId(course.id);
+                                const locked = isLocked(course);
+                                return (
+                                  <button
+                                    key={course.id}
+                                    onClick={() => {
+                                      if (autoSyncedLab) return;
+                                      const nextStatus = status === 'inactive' ? 'taking' : status === 'taking' ? 'passed' : 'inactive';
+                                      if (!locked || nextStatus === 'inactive') {
+                                        setCourseStatusWithValidation(course.id, nextStatus, false, status);
+                                      }
+                                    }}
+                                    disabled={autoSyncedLab}
+                                    className={`px-2 py-1 rounded-lg text-[10px] font-medium border transition ${
+                                      status === 'passed' ? `${t.passedBg} ${t.passedBorder} ${t.accentText}` :
+                                      status === 'taking' ? 'bg-blue-50 border-blue-200 text-blue-700' :
+                                      `${t.secondaryBg} ${t.cardBorder} ${t.textMuted}`
+                                    } ${autoSyncedLab ? 'opacity-60 cursor-default' : 'hover:shadow-sm cursor-pointer'}`}
+                                    title={`${course.title} (${course.units}u) - Click to cycle status`}
+                                  >
+                                    {course.id}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* Card View (default) */}
+                    {viewMode === "card" && (
                     <div className="grid md:grid-cols-3 gap-4">
                       {filteredTerms.map((term, tIdx) => (
                         <div key={tIdx} className="flex flex-col">
@@ -1404,6 +1556,11 @@ const CurriculumTrackerPage = ({
                                       {lab && (
                                         <span className="text-[9px] uppercase tracking-wide bg-slate-800 text-slate-50 px-1.5 py-0.5 rounded-full">
                                           Laboratory
+                                        </span>
+                                      )}
+                                      {isPetitionRequired(course.id) && (
+                                        <span className="text-[9px] uppercase tracking-wide bg-amber-500 text-white px-1.5 py-0.5 rounded-full" title="Petition may be required">
+                                          Petition
                                         </span>
                                       )}
                                     </div>
@@ -1937,7 +2094,7 @@ const GpaCalculatorPage = ({ courseGPA, setCourseGPA, errorMsg, setErrorMsg, suc
                     placeholder="Enter units"
                     className={`w-24 px-3 py-1.5 rounded border ${t.cardBorder} ${t.cardBg} ${t.textPrimary} text-sm`}
                   />
-                  <span className={`text-xs ${t.textMuted}`}>(independent from tracker)</span>
+                  <span className={`text-xs ${t.textMuted}`}>(Based on the Curriculum Tracker for the remaining units)</span>
                 </div>
               </div>
               
@@ -2260,7 +2417,48 @@ const GpaCalculatorPage = ({ courseGPA, setCourseGPA, errorMsg, setErrorMsg, suc
 // ---------------- CHAIN VISUALIZER PAGE ----------------
 const ChainVisualizerPage = ({ theme, courseStatus }) => {
   const [hoveredCourse, setHoveredCourse] = useState(null);
+  const [selectedCourse, setSelectedCourse] = useState(null);
+  const [zoom, setZoom] = useState(1);
+  const canvasRef = useRef(null);
   const t = THEMES[theme];
+
+  // Zoom limits
+  const MIN_ZOOM = 0.5;
+  const MAX_ZOOM = 2;
+  const ZOOM_STEP = 0.1;
+
+  // Handle scroll wheel zoom
+  const handleWheel = useCallback((e) => {
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP;
+      setZoom((prev) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, prev + delta)));
+    }
+  }, []);
+
+  // Attach wheel event listener with passive: false to allow preventDefault
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    canvas.addEventListener('wheel', handleWheel, { passive: false });
+    return () => {
+      canvas.removeEventListener('wheel', handleWheel);
+    };
+  }, [handleWheel]);
+
+  // Zoom controls
+  const handleZoomIn = () => {
+    setZoom((prev) => Math.min(MAX_ZOOM, prev + ZOOM_STEP));
+  };
+
+  const handleZoomOut = () => {
+    setZoom((prev) => Math.max(MIN_ZOOM, prev - ZOOM_STEP));
+  };
+
+  const handleZoomReset = () => {
+    setZoom(1);
+  };
 
   // Get all courses with their positions
   const allCourses = useMemo(() => {
@@ -2280,6 +2478,57 @@ const ChainVisualizerPage = ({ theme, courseStatus }) => {
     });
     return courses;
   }, []);
+
+  // Get course details by ID
+  const getCourseById = useCallback((courseId) => {
+    return allCourses.find(c => c.id === courseId);
+  }, [allCourses]);
+
+  // Get course title by ID
+  const getCourseTitle = useCallback((courseId) => {
+    const course = getCourseById(courseId);
+    return course ? course.title : courseId;
+  }, [getCourseById]);
+
+  // Get co-requisite (lab ↔ lecture relationship)
+  const getCorequisite = useCallback((course) => {
+    if (!course) return null;
+    
+    // If it's a lab course, check if there's a corresponding lecture
+    if (course.id.endsWith('L')) {
+      const lectureId = course.id.slice(0, -1);
+      const lecture = getCourseById(lectureId);
+      if (lecture) {
+        return { id: lectureId, title: lecture.title };
+      }
+    }
+    
+    // If it's a lecture course, check if there's a corresponding lab
+    const labId = course.id + 'L';
+    const lab = getCourseById(labId);
+    if (lab) {
+      return { id: labId, title: lab.title };
+    }
+    
+    return null;
+  }, [getCourseById]);
+
+  // Get post-requisites (courses that have this course as a prerequisite) FOR NEXT TERM ONLY
+  const getNextTermPostRequisites = useCallback((course) => {
+    if (!course) return [];
+    
+    // Calculate the next term position
+    const currentCol = course.yearIndex * 3 + course.termIndex;
+    const nextCol = currentCol + 1;
+    
+    // Find all courses that have this course as a prerequisite AND are in the next term
+    const postReqs = allCourses.filter(c => {
+      const cCol = c.yearIndex * 3 + c.termIndex;
+      return cCol === nextCol && c.prereqs.includes(course.id);
+    });
+    
+    return postReqs.map(c => ({ id: c.id, title: c.title }));
+  }, [allCourses]);
 
   // Get highlighted courses (dependents of hovered course)
   const highlightedCourses = useMemo(() => {
@@ -2314,6 +2563,27 @@ const ChainVisualizerPage = ({ theme, courseStatus }) => {
 
   const totalColumns = 12; // 4 years * 3 terms
 
+  // Get selected course details for modal
+  const selectedCourseDetails = useMemo(() => {
+    if (!selectedCourse) return null;
+    const course = getCourseById(selectedCourse);
+    if (!course) return null;
+    
+    const coreq = getCorequisite(course);
+    const postReqs = getNextTermPostRequisites(course);
+    const prereqDetails = course.prereqs.map(pId => {
+      const p = getCourseById(pId);
+      return { id: pId, title: p ? p.title : pId };
+    });
+    
+    return {
+      ...course,
+      corequisite: coreq,
+      postRequisites: postReqs,
+      prereqDetails,
+    };
+  }, [selectedCourse, getCourseById, getCorequisite, getNextTermPostRequisites]);
+
   return (
     <>
       <div className={`${t.heroBg} text-white pb-6 pt-10 px-6 shadow-xl`}>
@@ -2325,7 +2595,7 @@ const ChainVisualizerPage = ({ theme, courseStatus }) => {
             </h1>
           </div>
           <p className={`${t.heroText} opacity-90 text-sm md:text-base`}>
-            Hover over a course to see its prerequisite chain and all dependent courses.
+            Click on a course to see detailed information. Hover to see prerequisite chains. Use scroll wheel (Ctrl/Cmd + scroll) or zoom buttons to zoom.
           </p>
           <div className={`mt-3 flex gap-4 text-xs ${t.heroText}`}>
             <div className="flex items-center gap-2">
@@ -2344,11 +2614,111 @@ const ChainVisualizerPage = ({ theme, courseStatus }) => {
         </div>
       </div>
 
-      {/* Whiteboard-like visualization area */}
-      <div className="flex-1 w-full overflow-x-auto">
+      {/* Course Detail Modal */}
+      {selectedCourseDetails && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className={`${t.cardBg} rounded-xl shadow-2xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto`}>
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <span className={`text-xs font-mono font-bold px-2 py-1 rounded ${t.accentBg} ${t.accentText}`}>
+                  {selectedCourseDetails.id}
+                </span>
+                <h3 className={`text-lg font-semibold ${t.textPrimary} mt-2`}>
+                  {selectedCourseDetails.title}
+                </h3>
+              </div>
+              <button
+                onClick={() => setSelectedCourse(null)}
+                className={`${t.textMuted} hover:${t.textSecondary} p-1`}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              {/* Basic Info */}
+              <div className={`p-3 rounded-lg ${t.secondaryBg} border ${t.cardBorder}`}>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <span className={`text-xs ${t.textMuted} uppercase tracking-wide`}>Course Code</span>
+                    <p className={`font-semibold ${t.textPrimary}`}>{selectedCourseDetails.id}</p>
+                  </div>
+                  <div>
+                    <span className={`text-xs ${t.textMuted} uppercase tracking-wide`}>Units</span>
+                    <p className={`font-semibold ${t.textPrimary}`}>{selectedCourseDetails.units} Units</p>
+                  </div>
+                  <div className="col-span-2">
+                    <span className={`text-xs ${t.textMuted} uppercase tracking-wide`}>Course Title</span>
+                    <p className={`font-semibold ${t.textPrimary}`}>{selectedCourseDetails.title}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Pre-requisites */}
+              <div>
+                <h4 className={`text-sm font-semibold ${t.textPrimary} mb-2`}>Pre-requisite:</h4>
+                {selectedCourseDetails.prereqDetails.length > 0 ? (
+                  <div className="space-y-1">
+                    {selectedCourseDetails.prereqDetails.map((prereq) => (
+                      <div key={prereq.id} className={`text-sm ${t.textSecondary} p-2 rounded ${t.secondaryBg}`}>
+                        <span className="font-mono font-semibold">{prereq.id}</span> - {prereq.title}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className={`text-sm ${t.textMuted} italic`}>None</p>
+                )}
+              </div>
+
+              {/* Co-requisite */}
+              <div>
+                <h4 className={`text-sm font-semibold ${t.textPrimary} mb-2`}>Co-requisite:</h4>
+                {selectedCourseDetails.corequisite ? (
+                  <div className={`text-sm ${t.textSecondary} p-2 rounded ${t.secondaryBg}`}>
+                    <span className="font-mono font-semibold">{selectedCourseDetails.corequisite.id}</span> - {selectedCourseDetails.corequisite.title}
+                  </div>
+                ) : (
+                  <p className={`text-sm ${t.textMuted} italic`}>None</p>
+                )}
+              </div>
+
+              {/* Post-requisites (Next Term Only) */}
+              <div>
+                <h4 className={`text-sm font-semibold ${t.textPrimary} mb-2`}>Post-requisite (Next Term):</h4>
+                {selectedCourseDetails.postRequisites.length > 0 ? (
+                  <div className="space-y-1">
+                    {selectedCourseDetails.postRequisites.map((postReq) => (
+                      <div key={postReq.id} className={`text-sm ${t.textSecondary} p-2 rounded ${t.secondaryBg}`}>
+                        <span className="font-mono font-semibold">{postReq.id}</span> - {postReq.title}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className={`text-sm ${t.textMuted} italic`}>None</p>
+                )}
+              </div>
+
+              {/* Term Info */}
+              <div className={`text-xs ${t.textMuted} pt-2 border-t ${t.cardBorder}`}>
+                {selectedCourseDetails.yearName} • {selectedCourseDetails.termName}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Whiteboard-like visualization area with zoom */}
+      <div 
+        ref={canvasRef}
+        className="flex-1 w-full overflow-auto relative"
+      >
         <div 
-          className={`min-h-screen p-6 ${t.bodyBg}`}
+          className={`min-h-screen p-6 ${t.bodyBg} transition-transform duration-200`}
           style={{
+            transform: `scale(${zoom})`,
+            transformOrigin: 'top center',
+            width: `${100 / zoom}%`,
+            minWidth: '1200px',
             backgroundImage: `
               linear-gradient(to right, ${theme === 'dark' || theme === 'highContrast' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)'} 1px, transparent 1px),
               linear-gradient(to bottom, ${theme === 'dark' || theme === 'highContrast' ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)'} 1px, transparent 1px)
@@ -2356,11 +2726,11 @@ const ChainVisualizerPage = ({ theme, courseStatus }) => {
             backgroundSize: '20px 20px',
           }}
         >
-          <div className="max-w-7xl mx-auto">
+          <div className="w-full px-4">
             {/* Column Headers */}
             <div 
               className="grid gap-2 mb-4" 
-              style={{ gridTemplateColumns: `repeat(${totalColumns}, minmax(120px, 1fr))` }}
+              style={{ gridTemplateColumns: `repeat(${totalColumns}, minmax(100px, 1fr))` }}
             >
               {Array.from({ length: totalColumns }, (_, i) => {
                 const yearIdx = Math.floor(i / 3);
@@ -2385,7 +2755,7 @@ const ChainVisualizerPage = ({ theme, courseStatus }) => {
             {/* Course Grid */}
             <div 
               className="grid gap-2" 
-              style={{ gridTemplateColumns: `repeat(${totalColumns}, minmax(120px, 1fr))` }}
+              style={{ gridTemplateColumns: `repeat(${totalColumns}, minmax(100px, 1fr))` }}
             >
               {Array.from({ length: totalColumns }, (_, colIdx) => {
                 const courses = coursesByColumn[colIdx] || [];
@@ -2422,6 +2792,7 @@ const ChainVisualizerPage = ({ theme, courseStatus }) => {
                       return (
                         <div
                           key={course.id}
+                          onClick={() => setSelectedCourse(course.id)}
                           onMouseEnter={() => setHoveredCourse(course.id)}
                           onMouseLeave={() => setHoveredCourse(null)}
                           className={`p-2 rounded-lg border ${bgColor} ${borderColor} ${ringStyle} transition-all duration-200 cursor-pointer hover:shadow-lg ${
@@ -2444,11 +2815,6 @@ const ChainVisualizerPage = ({ theme, courseStatus }) => {
                             isHovered || isHighlighted || isPrereq ? 'text-slate-600' : t.textMuted
                           }`}>
                             {course.units} units
-                            {course.prereqs.length > 0 && (
-                              <span className="ml-1">
-                                • {course.prereqs.length} prereq{course.prereqs.length > 1 ? 's' : ''}
-                              </span>
-                            )}
                           </div>
                           {status === "passed" && (
                             <div className={`text-[8px] mt-1 ${t.passedBadge} px-1 py-0.5 rounded inline-block`}>
@@ -2467,11 +2833,1793 @@ const ChainVisualizerPage = ({ theme, courseStatus }) => {
             <div className={`mt-8 p-4 ${t.cardBg} rounded-lg border ${t.cardBorder}`}>
               <h3 className={`text-sm font-semibold ${t.textPrimary} mb-2`}>How to Use</h3>
               <p className={`text-xs ${t.textSecondary}`}>
-                Hover over any course to visualize its prerequisite chain. Courses highlighted in <span className="text-yellow-600 font-semibold">yellow</span> are dependent on the hovered course - failing the hovered course will delay these subjects. Courses in <span className="text-orange-600 font-semibold">orange</span> are prerequisites for the hovered course.
+                <strong>Click</strong> on any course to see detailed information including prerequisites, co-requisites, and post-requisites for the next term. Hover over any course to visualize its prerequisite chain. Courses highlighted in <span className="text-yellow-600 font-semibold">yellow</span> are dependent on the hovered course - failing the hovered course will delay these subjects. Courses in <span className="text-orange-600 font-semibold">orange</span> are prerequisites for the hovered course.
               </p>
               <p className={`text-xs ${t.textMuted} mt-2`}>
-                This visualization helps you understand the consequences of failing a course and plan your academic path accordingly.
+                Use <strong>Ctrl/Cmd + scroll wheel</strong> or the zoom buttons at the bottom right to zoom in and out of the visualization.
               </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Zoom Controls - Fixed at bottom right */}
+        <div className={`fixed bottom-6 right-6 flex flex-col gap-2 ${t.cardBg} p-2 rounded-lg shadow-lg border ${t.cardBorder} z-30`}>
+          <button
+            onClick={handleZoomIn}
+            disabled={zoom >= MAX_ZOOM}
+            className={`p-2 rounded-lg ${t.primaryBtn} ${t.primaryBtnText} transition disabled:opacity-50 disabled:cursor-not-allowed`}
+            title="Zoom In"
+          >
+            <ZoomIn className="w-4 h-4" />
+          </button>
+          <button
+            onClick={handleZoomReset}
+            className={`p-2 rounded-lg ${t.secondaryBg} ${t.textSecondary} hover:opacity-80 transition text-xs font-mono`}
+            title="Reset Zoom"
+          >
+            {Math.round(zoom * 100)}%
+          </button>
+          <button
+            onClick={handleZoomOut}
+            disabled={zoom <= MIN_ZOOM}
+            className={`p-2 rounded-lg ${t.primaryBtn} ${t.primaryBtnText} transition disabled:opacity-50 disabled:cursor-not-allowed`}
+            title="Zoom Out"
+          >
+            <ZoomOut className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    </>
+  );
+};
+
+// ---------------- MENU LANDING PAGE ----------------
+const MenuLandingPage = ({ 
+  theme, 
+  setActivePage, 
+  courseStatus,
+  yearEnteredCollege,
+  setYearEnteredCollege,
+}) => {
+  const t = THEMES[theme];
+
+  // Calculate progress stats
+  const totalCourses = CURRICULUM_DATA.reduce(
+    (acc, year) => acc + year.terms.reduce((tAcc, term) => tAcc + term.courses.length, 0),
+    0
+  );
+  const passedCourses = Object.values(courseStatus).filter(s => s === "passed").length;
+  const activeCourses = Object.values(courseStatus).filter(s => s === "taking").length;
+  const progressPercent = totalCourses > 0 ? Math.round((passedCourses / totalCourses) * 100) : 0;
+
+  // Calculate total and completed units
+  const totalUnits = CURRICULUM_DATA.reduce(
+    (acc, year) =>
+      acc + year.terms.reduce((tAcc, term) => tAcc + term.courses.reduce((cAcc, c) => cAcc + c.units, 0), 0),
+    0
+  );
+  const completedUnits = Object.entries(courseStatus).reduce((acc, [id, status]) => {
+    if (status === "passed") {
+      for (const year of CURRICULUM_DATA) {
+        for (const term of year.terms) {
+          for (const c of term.courses) {
+            if (c.id === id) return acc + c.units;
+          }
+        }
+      }
+    }
+    return acc;
+  }, 0);
+
+  // Calculate expected graduation considering dependency chains
+  const calculateExpectedGraduation = () => {
+    if (!yearEnteredCollege) return null;
+    const entryYear = parseInt(yearEnteredCollege);
+    if (isNaN(entryYear) || entryYear < 2000 || entryYear > 2100) return null;
+
+    // Find courses that are not passed
+    const incompleteCourses = [];
+    CURRICULUM_DATA.forEach((year, yIdx) => {
+      year.terms.forEach((term, tIdx) => {
+        term.courses.forEach((course) => {
+          if (courseStatus[course.id] !== "passed") {
+            incompleteCourses.push({
+              ...course,
+              yearIndex: yIdx,
+              termIndex: tIdx,
+              termNumber: yIdx * 3 + tIdx,
+            });
+          }
+        });
+      });
+    });
+
+    if (incompleteCourses.length === 0) {
+      // All courses passed!
+      return { year: entryYear + 4, term: "Completed!", delayTerms: 0 };
+    }
+
+    // Calculate delay terms from incomplete courses that block others
+    let maxDelayedTermNumber = 0;
+    
+    incompleteCourses.forEach((course) => {
+      // Get all dependents of this course
+      const dependents = getAllDependents(course.id);
+      
+      // Find the furthest term this course or its dependents are in
+      let furthestTerm = course.termNumber;
+      
+      CURRICULUM_DATA.forEach((year, yIdx) => {
+        year.terms.forEach((term, tIdx) => {
+          term.courses.forEach((c) => {
+            if (dependents.includes(c.id) && courseStatus[c.id] !== "passed") {
+              const termNum = yIdx * 3 + tIdx;
+              if (termNum > furthestTerm) {
+                furthestTerm = termNum;
+              }
+            }
+          });
+        });
+      });
+      
+      if (furthestTerm > maxDelayedTermNumber) {
+        maxDelayedTermNumber = furthestTerm;
+      }
+    });
+
+    // Constants for degree structure
+    const STANDARD_DEGREE_YEARS = 4;
+    const TERMS_PER_YEAR = 3;
+    const STANDARD_TOTAL_TERMS = STANDARD_DEGREE_YEARS * TERMS_PER_YEAR; // 12 terms for standard 4-year degree
+    
+    // Calculate remaining terms and graduation timing
+    const lastIncompleteTermNumber = maxDelayedTermNumber + 1;
+    
+    // Calculate years from start based on the last incomplete term
+    // Divide by terms per year and round up to get total years needed
+    const yearsFromStart = Math.ceil(lastIncompleteTermNumber / TERMS_PER_YEAR);
+    const graduationYear = entryYear + yearsFromStart;
+    
+    // Determine which term within the final year
+    const termInYear = (maxDelayedTermNumber % TERMS_PER_YEAR);
+    const termNames = ["1st Term", "2nd Term", "3rd Term"];
+    
+    // Calculate delay: difference between actual years and standard degree duration
+    const delayInYears = Math.max(0, yearsFromStart - STANDARD_DEGREE_YEARS);
+    
+    return { 
+      year: graduationYear, 
+      term: termNames[termInYear],
+      delayTerms: delayInYears,
+      incompleteCourses: incompleteCourses.length,
+    };
+  };
+
+  const expectedGraduation = calculateExpectedGraduation();
+
+  // Features for the landing page
+  const features = [
+    {
+      id: "tracker",
+      title: "Curriculum Tracker",
+      description: "Track your academic progress through the CE curriculum with detailed status for each course.",
+      icon: LayoutTemplate,
+      color: "from-green-500 to-emerald-600",
+    },
+    {
+      id: "gpa",
+      title: "GPA Calculator",
+      description: "Calculate your term and cumulative GPA with target grade planning tools.",
+      icon: Calculator,
+      color: "from-blue-500 to-indigo-600",
+    },
+    {
+      id: "visualizer",
+      title: "Chain Visualizer",
+      description: "Visualize prerequisite chains and understand course dependencies at a glance.",
+      icon: Link2,
+      color: "from-purple-500 to-violet-600",
+    },
+    {
+      id: "schedule",
+      title: "Schedule Maker",
+      description: "Build mock enrolments by selecting course sections and checking for schedule conflicts.",
+      icon: Table,
+      color: "from-pink-500 to-rose-600",
+    },
+  ];
+
+  return (
+    <>
+      {/* Hero Section */}
+      <div className={`bg-gradient-to-br ${t.heroGradient} text-white py-16 px-6`}>
+        <div className="max-w-6xl mx-auto">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-8">
+            <div className="text-center md:text-left">
+              <div className="flex items-center gap-3 mb-4 justify-center md:justify-start">
+                <GraduationCap className={`w-12 h-12 ${t.heroAccent}`} />
+                <h1 className="text-4xl md:text-5xl font-bold tracking-tight">
+                  Builders Progress
+                </h1>
+              </div>
+              <p className={`${t.heroText} opacity-90 text-lg md:text-xl max-w-xl`}>
+                Your complete academic companion for the BSCE curriculum at FEU Tech. 
+                Track progress, calculate GPA, and plan your path to graduation.
+              </p>
+              
+              {/* Quick Stats */}
+              <div className="flex flex-wrap gap-4 mt-6 justify-center md:justify-start">
+                <div className={`px-4 py-2 rounded-lg bg-white/10 backdrop-blur-sm border border-white/20`}>
+                  <span className="text-2xl font-bold">{progressPercent}%</span>
+                  <span className="text-sm opacity-80 ml-2">Complete</span>
+                </div>
+                <div className={`px-4 py-2 rounded-lg bg-white/10 backdrop-blur-sm border border-white/20`}>
+                  <span className="text-2xl font-bold">{completedUnits}</span>
+                  <span className="text-sm opacity-80 ml-2">/ {totalUnits} Units</span>
+                </div>
+                {activeCourses > 0 && (
+                  <div className={`px-4 py-2 rounded-lg bg-white/10 backdrop-blur-sm border border-white/20`}>
+                    <span className="text-2xl font-bold">{activeCourses}</span>
+                    <span className="text-sm opacity-80 ml-2">Active</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Expected Graduation Card */}
+            <div className={`${t.cardBg} rounded-2xl p-6 shadow-2xl max-w-sm w-full`}>
+              <div className="flex items-center gap-2 mb-4">
+                <Clock className={`w-5 h-5 ${t.accentText}`} />
+                <h3 className={`font-semibold ${t.textPrimary}`}>Expected Graduation</h3>
+              </div>
+              
+              {/* Entry Year Input - Always visible for editing */}
+              <div className="mb-4">
+                <label className={`text-xs ${t.textMuted} block mb-1`}>Year Started College:</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  min="2000"
+                  max="2100"
+                  placeholder="e.g., 2022"
+                  value={yearEnteredCollege}
+                  onChange={(e) => {
+                    // Allow only numeric input
+                    const value = e.target.value.replace(/[^0-9]/g, '');
+                    setYearEnteredCollege(value);
+                  }}
+                  className={`w-full px-4 py-2 rounded-lg border ${t.cardBorder} ${t.cardBg} ${t.textPrimary} text-center text-lg font-semibold`}
+                />
+              </div>
+              
+              {yearEnteredCollege && expectedGraduation ? (
+                <div className="text-center">
+                  <div className={`text-4xl font-bold ${t.accentText} mb-1`}>
+                    {expectedGraduation.term === "Completed!" ? "🎉" : expectedGraduation.year}
+                  </div>
+                  <div className={`text-sm ${t.textSecondary}`}>
+                    {expectedGraduation.term === "Completed!" 
+                      ? "Congratulations! You've completed all courses!" 
+                      : `${expectedGraduation.term}, S.Y. ${expectedGraduation.year}-${expectedGraduation.year + 1}`}
+                  </div>
+                  {expectedGraduation.delayTerms > 0 && (
+                    <div className={`mt-2 text-xs px-2 py-1 rounded-lg bg-orange-100 text-orange-700`}>
+                      ⚠️ Delayed by ~{expectedGraduation.delayTerms} year{expectedGraduation.delayTerms !== 1 ? 's' : ''} due to incomplete courses
+                    </div>
+                  )}
+                  {expectedGraduation.incompleteCourses && (
+                    <div className={`mt-2 text-xs ${t.textMuted}`}>
+                      {expectedGraduation.incompleteCourses} course{expectedGraduation.incompleteCourses !== 1 ? 's' : ''} remaining
+                    </div>
+                  )}
+                </div>
+              ) : yearEnteredCollege ? (
+                <div className={`text-sm ${t.textMuted} text-center`}>
+                  Enter a valid year (2000-2100)
+                </div>
+              ) : (
+                <div className={`text-sm ${t.textSecondary} text-center`}>
+                  Enter your entry year above to see your expected graduation
+                </div>
+              )}
+
+              {/* Progress Bar */}
+              <div className="mt-4">
+                <div className="flex justify-between text-xs mb-1">
+                  <span className={t.textMuted}>Progress</span>
+                  <span className={t.textSecondary}>{progressPercent}%</span>
+                </div>
+                <div className={`h-2 rounded-full ${t.secondaryBg} overflow-hidden`}>
+                  <div 
+                    className={`h-full bg-gradient-to-r ${t.progressBar} transition-all duration-500`}
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Features Grid */}
+      <div className={`${t.bodyBg} py-12 px-6`}>
+        <div className="max-w-6xl mx-auto">
+          <h2 className={`text-2xl font-bold ${t.textPrimary} mb-8 text-center`}>
+            Academic Tools
+          </h2>
+          
+          <div className="flex flex-wrap justify-center gap-4">
+            {features.map((feature) => (
+              <button
+                key={feature.id}
+                onClick={() => feature.id !== "schedule" && setActivePage(feature.id)}
+                disabled={feature.id === "schedule"}
+                className={`${t.cardBg} rounded-xl p-5 border ${t.cardBorder} ${feature.id === "schedule" ? "opacity-60 cursor-not-allowed" : `${t.cardHover} hover:shadow-xl cursor-pointer`} transition-all duration-300 text-left group w-full sm:w-64 relative`}
+              >
+                {feature.id === "schedule" && (
+                  <div className="absolute -top-2 -right-2 bg-amber-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md">
+                    Coming Soon
+                  </div>
+                )}
+                <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${feature.color} flex items-center justify-center mb-3 ${feature.id !== "schedule" ? "group-hover:scale-110" : ""} transition-transform`}>
+                  <feature.icon className="w-5 h-5 text-white" />
+                </div>
+                <h3 className={`font-semibold ${t.textPrimary} mb-1 text-sm`}>{feature.title}</h3>
+                <p className={`text-xs ${t.textSecondary}`}>{feature.description}</p>
+                {feature.id === "schedule" && (
+                  <div className={`mt-2 flex items-center gap-1 text-amber-600`}>
+                    <AlertTriangle className="w-3 h-3" />
+                    <span className="text-[10px] font-medium">Under Development</span>
+                  </div>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Progress Overview Section */}
+      <div className={`${t.secondaryBg} py-12 px-6 border-t ${t.cardBorder}`}>
+        <div className="max-w-6xl mx-auto">
+          <h2 className={`text-2xl font-bold ${t.textPrimary} mb-8 text-center`}>
+            Progress by Year
+          </h2>
+          
+          <div className="grid md:grid-cols-4 gap-4">
+            {CURRICULUM_DATA.map((year, yIdx) => {
+              const yearCourses = year.terms.flatMap(t => t.courses);
+              const yearPassed = yearCourses.filter(c => courseStatus[c.id] === "passed").length;
+              const yearTotal = yearCourses.length;
+              const yearPercent = yearTotal > 0 ? Math.round((yearPassed / yearTotal) * 100) : 0;
+              const yearUnits = yearCourses.reduce((acc, c) => acc + c.units, 0);
+              const yearPassedUnits = yearCourses
+                .filter(c => courseStatus[c.id] === "passed")
+                .reduce((acc, c) => acc + c.units, 0);
+              const yearRemainingUnits = yearUnits - yearPassedUnits;
+
+              // Calculate the gauge arc
+              const gaugeRadius = 45;
+              const gaugeStrokeWidth = 8;
+              const gaugeCircumference = Math.PI * gaugeRadius; // Semi-circle
+              const gaugeFillLength = (yearPercent / 100) * gaugeCircumference;
+
+              return (
+                <div key={yIdx} className={`${t.cardBg} rounded-xl p-4 border ${t.cardBorder}`}>
+                  <h3 className={`font-semibold ${t.textPrimary} text-sm text-center mb-2`}>{year.year}</h3>
+                  
+                  {/* Gauge Chart */}
+                  <div className="relative flex justify-center items-center mb-2">
+                    <svg width="120" height="70" viewBox="0 0 120 70">
+                      {/* Background arc */}
+                      <path
+                        d="M 10 60 A 45 45 0 0 1 110 60"
+                        fill="none"
+                        stroke={theme === 'dark' || theme === 'highContrast' ? '#374151' : '#e5e7eb'}
+                        strokeWidth={gaugeStrokeWidth}
+                        strokeLinecap="round"
+                      />
+                      {/* Progress arc */}
+                      <path
+                        d="M 10 60 A 45 45 0 0 1 110 60"
+                        fill="none"
+                        stroke={theme === 'feuGreen' ? '#22c55e' : theme === 'acesTheme' ? '#3b82f6' : theme === 'dark' ? '#3b82f6' : '#facc15'}
+                        strokeWidth={gaugeStrokeWidth}
+                        strokeLinecap="round"
+                        strokeDasharray={`${gaugeFillLength} ${gaugeCircumference}`}
+                        style={{ transition: 'stroke-dasharray 0.5s ease' }}
+                      />
+                      {/* Percentage text */}
+                      <text
+                        x="60"
+                        y="55"
+                        textAnchor="middle"
+                        className={`text-lg font-bold fill-current ${t.textPrimary}`}
+                        style={{ fontSize: '18px' }}
+                      >
+                        {yearPercent}%
+                      </text>
+                    </svg>
+                  </div>
+                  
+                  {/* Units Summary */}
+                  <div className={`text-xs ${t.textSecondary} space-y-1 mb-3`}>
+                    <div className="flex justify-between items-center">
+                      <span className="flex items-center gap-1">
+                        <span className={`w-2 h-2 rounded-full ${theme === 'feuGreen' ? 'bg-green-500' : theme === 'acesTheme' ? 'bg-blue-500' : theme === 'dark' ? 'bg-blue-500' : 'bg-yellow-400'}`}></span>
+                        Passed Units
+                      </span>
+                      <span className="font-semibold">{yearPassedUnits}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="flex items-center gap-1">
+                        <span className={`w-2 h-2 rounded-full ${theme === 'dark' || theme === 'highContrast' ? 'bg-gray-600' : 'bg-gray-300'}`}></span>
+                        Remaining Units
+                      </span>
+                      <span className="font-semibold">{yearRemainingUnits}</span>
+                    </div>
+                    <div className="flex justify-between items-center pt-1 border-t border-slate-200/50">
+                      <span>Total Units</span>
+                      <span className="font-semibold">{yearUnits}</span>
+                    </div>
+                  </div>
+
+                  {/* Term breakdown */}
+                  <div className="pt-3 border-t border-slate-100 space-y-2">
+                    {year.terms.map((term, tIdx) => {
+                      const termPassed = term.courses.filter(c => courseStatus[c.id] === "passed").length;
+                      const termTotal = term.courses.length;
+                      const termPercent = termTotal > 0 ? Math.round((termPassed / termTotal) * 100) : 0;
+                      const termUnits = term.courses.reduce((acc, c) => acc + c.units, 0);
+                      const termPassedUnits = term.courses
+                        .filter(c => courseStatus[c.id] === "passed")
+                        .reduce((acc, c) => acc + c.units, 0);
+                      
+                      return (
+                        <div key={tIdx} className="flex items-center gap-2">
+                          <span className={`text-[10px] ${t.textMuted} w-12`}>{term.termName}</span>
+                          <div className={`flex-1 h-1.5 rounded-full ${t.secondaryBg} overflow-hidden`}>
+                            <div 
+                              className={`h-full bg-gradient-to-r ${t.progressBar} transition-all`}
+                              style={{ width: `${termPercent}%` }}
+                            />
+                          </div>
+                          <span className={`text-[10px] ${t.textMuted} w-16 text-right`}>{termPassedUnits}/{termUnits}u</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Actions */}
+      <div className={`${t.bodyBg} py-8 px-6 border-t ${t.cardBorder}`}>
+        <div className="max-w-6xl mx-auto">
+          <div className="flex flex-wrap justify-center gap-4">
+            <a
+              href={STUDENT_PORTAL_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl border ${t.cardBorder} ${t.cardBg} ${t.textSecondary} hover:${t.textPrimary} transition`}
+            >
+              <BookOpen className="w-4 h-4" />
+              FEU Tech Student Portal (SOLAR)
+            </a>
+          </div>
+        </div>
+      </div>
+
+
+      {/* Footer */}
+      <footer className={`${t.secondaryBg} border-t ${t.cardBorder} py-8 px-6`}>
+        <div className="max-w-6xl mx-auto text-center space-y-3">
+          <p className={`text-sm ${t.textMuted}`}>
+            Built for CE students at FEU Institute of Technology
+          </p>
+          <p className={`text-xs ${t.textMuted}`}>
+            Data is stored locally on your device. Export your progress regularly for backup.
+          </p>
+          <p className={`text-xs ${t.textMuted} max-w-2xl mx-auto leading-relaxed`}>
+            This is a personal and on-going project, and it's not affiliated with FEU Institute of Technology nor the FEU Tech Civil Engineering Department. Development of this website uses Github Copilot, and this website is a work-in-progress and is a pre-release. It might have some issues with the functionality of the site.
+          </p>
+        </div>
+      </footer>
+    </>
+  );
+};
+
+// ---------------- GRADUATION PLANNER PAGE ----------------
+const GraduationPlannerPage = ({ 
+  theme, 
+  courseStatus, 
+  setCourseStatus,
+  setSuccessMsg,
+  setErrorMsg,
+  onConfetti,
+}) => {
+  const t = THEMES[theme];
+  const [planView, setPlanView] = useState("timeline"); // "timeline" | "table" | "compact"
+  const [moveHistory, setMoveHistory] = useState([]);
+  const [selectedCourses, setSelectedCourses] = useState(new Set());
+  const [showUnscheduled, setShowUnscheduled] = useState(true);
+  const [coursePriorities, setCoursePriorities] = useState({});
+  const [lockedCourses, setLockedCourses] = useState({});
+  const [showPriorityModal, setShowPriorityModal] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [groupBy, setGroupBy] = useState("term"); // "term" | "year" | "department"
+
+  // Load saved settings
+  useEffect(() => {
+    const savedPriorities = localStorage.getItem("ce_course_priorities");
+    if (savedPriorities) setCoursePriorities(JSON.parse(savedPriorities));
+    
+    const savedLocked = localStorage.getItem("ce_locked_courses");
+    if (savedLocked) setLockedCourses(JSON.parse(savedLocked));
+  }, []);
+
+  // Save settings
+  useEffect(() => {
+    localStorage.setItem("ce_course_priorities", JSON.stringify(coursePriorities));
+  }, [coursePriorities]);
+
+  useEffect(() => {
+    localStorage.setItem("ce_locked_courses", JSON.stringify(lockedCourses));
+  }, [lockedCourses]);
+
+  // Get all courses flattened
+  const allCourses = useMemo(() => {
+    const courses = [];
+    CURRICULUM_DATA.forEach((year, yIdx) => {
+      year.terms.forEach((term, tIdx) => {
+        term.courses.forEach((course) => {
+          courses.push({
+            ...course,
+            yearIndex: yIdx,
+            termIndex: tIdx,
+            yearName: year.year,
+            termName: term.termName,
+            status: courseStatus[course.id] || "inactive",
+          });
+        });
+      });
+    });
+    return courses;
+  }, [courseStatus]);
+
+  // Filter courses based on search
+  const filteredCourses = useMemo(() => {
+    if (!searchQuery) return allCourses;
+    const query = searchQuery.toLowerCase();
+    return allCourses.filter(c => 
+      c.id.toLowerCase().includes(query) ||
+      c.title.toLowerCase().includes(query)
+    );
+  }, [allCourses, searchQuery]);
+
+  // Get unscheduled courses (not passed, not taking)
+  const unscheduledCourses = allCourses.filter(c => 
+    c.status === "inactive" && 
+    !lockedCourses[c.id]
+  );
+
+  // Undo last action
+  const handleUndo = () => {
+    if (moveHistory.length === 0) return;
+    
+    const lastAction = moveHistory[moveHistory.length - 1];
+    setCourseStatus(lastAction.previousState);
+    setMoveHistory(prev => prev.slice(0, -1));
+    setSuccessMsg("Action undone successfully!");
+    setTimeout(() => setSuccessMsg(""), 2000);
+  };
+
+  // Toggle course selection
+  const toggleCourseSelection = (courseId) => {
+    setSelectedCourses(prev => {
+      const next = new Set(prev);
+      if (next.has(courseId)) {
+        next.delete(courseId);
+      } else {
+        next.add(courseId);
+      }
+      return next;
+    });
+  };
+
+  // Move selected courses to a status
+  const moveSelectedToStatus = (newStatus) => {
+    if (selectedCourses.size === 0) return;
+    
+    const previousState = { ...courseStatus };
+    setCourseStatus(prev => {
+      const next = { ...prev };
+      selectedCourses.forEach(id => {
+        next[id] = newStatus;
+      });
+      return next;
+    });
+    
+    setMoveHistory(prev => [...prev, { 
+      action: "bulk_move", 
+      courses: Array.from(selectedCourses),
+      previousState 
+    }]);
+    
+    setSelectedCourses(new Set());
+    setSuccessMsg(`Moved ${selectedCourses.size} course(s) to ${newStatus}`);
+    setTimeout(() => setSuccessMsg(""), 2000);
+    
+    if (newStatus === "passed" && onConfetti) {
+      onConfetti("small");
+    }
+  };
+
+  // Set course priority
+  const setPriority = (courseId, priority) => {
+    setCoursePriorities(prev => ({
+      ...prev,
+      [courseId]: priority
+    }));
+    setShowPriorityModal(null);
+  };
+
+  // Lock course to term
+  const toggleLock = (courseId) => {
+    setLockedCourses(prev => {
+      const next = { ...prev };
+      if (next[courseId]) {
+        delete next[courseId];
+      } else {
+        const course = allCourses.find(c => c.id === courseId);
+        if (course) {
+          next[courseId] = { yearIndex: course.yearIndex, termIndex: course.termIndex };
+        }
+      }
+      return next;
+    });
+  };
+
+  // Swap two courses' status
+  const swapCourseStatus = () => {
+    if (selectedCourses.size !== 2) {
+      setErrorMsg("Select exactly 2 courses to swap their status");
+      setTimeout(() => setErrorMsg(""), 2000);
+      return;
+    }
+    
+    const [courseA, courseB] = Array.from(selectedCourses);
+    const statusA = courseStatus[courseA] || "inactive";
+    const statusB = courseStatus[courseB] || "inactive";
+    
+    const previousState = { ...courseStatus };
+    setCourseStatus(prev => ({
+      ...prev,
+      [courseA]: statusB,
+      [courseB]: statusA,
+    }));
+    
+    setMoveHistory(prev => [...prev, {
+      action: "swap",
+      courses: [courseA, courseB],
+      previousState
+    }]);
+    
+    setSelectedCourses(new Set());
+    setSuccessMsg(`Swapped status of ${courseA} and ${courseB}`);
+    setTimeout(() => setSuccessMsg(""), 2000);
+  };
+
+  // Export plan as image (simulation - would need html2canvas in production)
+  const exportAsImage = () => {
+    setSuccessMsg("Plan exported! (Feature in development - use browser screenshot for now)");
+    setTimeout(() => setSuccessMsg(""), 3000);
+  };
+
+  // Export to calendar (ICS format simulation)
+  const exportToCalendar = () => {
+    const activeCourses = allCourses.filter(c => c.status === "taking");
+    if (activeCourses.length === 0) {
+      setErrorMsg("No active courses to export");
+      setTimeout(() => setErrorMsg(""), 2000);
+      return;
+    }
+    
+    let icsContent = `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Builders Progress//EN
+`;
+    
+    activeCourses.forEach(course => {
+      const eventId = `${course.id}-${Date.now()}`;
+      icsContent += `BEGIN:VEVENT
+UID:${eventId}
+SUMMARY:${course.id} - ${course.title}
+DESCRIPTION:Units: ${course.units}
+STATUS:CONFIRMED
+END:VEVENT
+`;
+    });
+    
+    icsContent += `END:VCALENDAR`;
+    
+    const blob = new Blob([icsContent], { type: "text/calendar" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "course-schedule.ics";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    setSuccessMsg("Calendar exported successfully!");
+    setTimeout(() => setSuccessMsg(""), 2000);
+  };
+
+  return (
+    <>
+      {/* Hero */}
+      <div className={`${t.heroBg} text-white pb-8 pt-10 px-6 shadow-xl`}>
+        <div className="max-w-6xl mx-auto">
+          <div className="flex items-center gap-3 mb-2">
+            <Calendar className={`w-8 h-8 ${t.heroAccent}`} />
+            <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
+              Graduation Planner
+            </h1>
+          </div>
+          <p className={`${t.heroText} opacity-90 text-sm md:text-base`}>
+            Plan your path to graduation with smart scheduling, priorities, and conflict detection.
+          </p>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className={`${t.bodyBg} flex-1`}>
+        <div className="max-w-6xl mx-auto px-4 py-6">
+          {/* Toolbar */}
+          <div className={`${t.cardBg} rounded-xl p-4 mb-6 shadow-sm border ${t.cardBorder}`}>
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              {/* View Mode */}
+              <div className="flex items-center gap-2">
+                <div className={`flex items-center gap-1 ${t.secondaryBg} rounded-lg p-1`}>
+                  <button
+                    onClick={() => setPlanView("timeline")}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition flex items-center gap-1 ${
+                      planView === "timeline"
+                        ? `${t.primaryBtn} ${t.primaryBtnText}`
+                        : `${t.textSecondary} hover:${t.textPrimary}`
+                    }`}
+                  >
+                    <LayoutGrid className="w-3.5 h-3.5" />
+                    Timeline
+                  </button>
+                  <button
+                    onClick={() => setPlanView("table")}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition flex items-center gap-1 ${
+                      planView === "table"
+                        ? `${t.primaryBtn} ${t.primaryBtnText}`
+                        : `${t.textSecondary} hover:${t.textPrimary}`
+                    }`}
+                  >
+                    <Table className="w-3.5 h-3.5" />
+                    Table
+                  </button>
+                  <button
+                    onClick={() => setPlanView("compact")}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition flex items-center gap-1 ${
+                      planView === "compact"
+                        ? `${t.primaryBtn} ${t.primaryBtnText}`
+                        : `${t.textSecondary} hover:${t.textPrimary}`
+                    }`}
+                  >
+                    <Layers className="w-3.5 h-3.5" />
+                    Compact
+                  </button>
+                </div>
+
+                {/* Group By */}
+                <select
+                  value={groupBy}
+                  onChange={(e) => setGroupBy(e.target.value)}
+                  className={`px-3 py-1.5 rounded-lg text-xs border ${t.cardBorder} ${t.cardBg} ${t.textSecondary}`}
+                >
+                  <option value="term">Group by Term</option>
+                  <option value="year">Group by Year</option>
+                  <option value="department">Group by Department</option>
+                </select>
+              </div>
+
+              {/* Search */}
+              <div className="relative flex-1 max-w-xs">
+                <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${t.textMuted}`} />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search courses..."
+                  className={`w-full pl-9 pr-4 py-1.5 rounded-lg text-xs border ${t.cardBorder} ${t.cardBg} ${t.textPrimary}`}
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleUndo}
+                  disabled={moveHistory.length === 0}
+                  className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border ${t.cardBorder} ${t.textSecondary} hover:${t.textPrimary} transition disabled:opacity-50`}
+                >
+                  <Undo2 className="w-3.5 h-3.5" />
+                  Undo
+                </button>
+                <button
+                  onClick={exportAsImage}
+                  className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border ${t.cardBorder} ${t.textSecondary} hover:${t.textPrimary} transition`}
+                >
+                  <Image className="w-3.5 h-3.5" />
+                  Export Image
+                </button>
+                <button
+                  onClick={exportToCalendar}
+                  className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border ${t.cardBorder} ${t.textSecondary} hover:${t.textPrimary} transition`}
+                >
+                  <Calendar className="w-3.5 h-3.5" />
+                  Export Calendar
+                </button>
+              </div>
+            </div>
+
+            {/* Bulk Actions */}
+            {selectedCourses.size > 0 && (
+              <div className={`mt-4 pt-4 border-t ${t.cardBorder} flex items-center gap-4`}>
+                <span className={`text-sm ${t.textSecondary}`}>
+                  {selectedCourses.size} course(s) selected
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => moveSelectedToStatus("taking")}
+                    className={`px-3 py-1 rounded-lg text-xs font-medium bg-blue-100 text-blue-700 hover:bg-blue-200 transition`}
+                  >
+                    Mark Active
+                  </button>
+                  <button
+                    onClick={() => moveSelectedToStatus("passed")}
+                    className={`px-3 py-1 rounded-lg text-xs font-medium bg-green-100 text-green-700 hover:bg-green-200 transition`}
+                  >
+                    Mark Passed
+                  </button>
+                  <button
+                    onClick={() => moveSelectedToStatus("inactive")}
+                    className={`px-3 py-1 rounded-lg text-xs font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 transition`}
+                  >
+                    Mark Inactive
+                  </button>
+                  {selectedCourses.size === 2 && (
+                    <button
+                      onClick={swapCourseStatus}
+                      className={`px-3 py-1 rounded-lg text-xs font-medium bg-purple-100 text-purple-700 hover:bg-purple-200 transition flex items-center gap-1`}
+                    >
+                      <ArrowLeftRight className="w-3.5 h-3.5" />
+                      Swap Status
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setSelectedCourses(new Set())}
+                    className={`px-3 py-1 rounded-lg text-xs font-medium ${t.textMuted} hover:${t.textSecondary}`}
+                  >
+                    Clear Selection
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Plan View */}
+          {planView === "table" ? (
+            /* Table View */
+            <div className={`${t.cardBg} rounded-xl shadow-sm border ${t.cardBorder} overflow-hidden`}>
+              <div className="overflow-x-auto">
+                <table className={`w-full text-xs ${t.textPrimary}`}>
+                  <thead className={`${t.secondaryBg} border-b ${t.cardBorder}`}>
+                    <tr>
+                      <th className="w-8 px-3 py-3">
+                        <input
+                          type="checkbox"
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedCourses(new Set(filteredCourses.map(c => c.id)));
+                            } else {
+                              setSelectedCourses(new Set());
+                            }
+                          }}
+                          checked={selectedCourses.size === filteredCourses.length && filteredCourses.length > 0}
+                        />
+                      </th>
+                      <th className="text-left px-3 py-3 font-semibold">Code</th>
+                      <th className="text-left px-3 py-3 font-semibold">Title</th>
+                      <th className="text-center px-3 py-3 font-semibold">Units</th>
+                      <th className="text-center px-3 py-3 font-semibold">Year</th>
+                      <th className="text-center px-3 py-3 font-semibold">Term</th>
+                      <th className="text-center px-3 py-3 font-semibold">Status</th>
+                      <th className="text-center px-3 py-3 font-semibold">Priority</th>
+                      <th className="text-center px-3 py-3 font-semibold">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredCourses.map((course) => (
+                      <tr 
+                        key={course.id} 
+                        className={`border-b ${t.cardBorder} hover:${t.secondaryBg} ${
+                          selectedCourses.has(course.id) ? t.highlightBg : ''
+                        } ${course.status === 'passed' ? t.passedBg : ''}`}
+                      >
+                        <td className="px-3 py-2">
+                          <input
+                            type="checkbox"
+                            checked={selectedCourses.has(course.id)}
+                            onChange={() => toggleCourseSelection(course.id)}
+                          />
+                        </td>
+                        <td className="px-3 py-2 font-mono font-semibold">{course.id}</td>
+                        <td className="px-3 py-2">{course.title}</td>
+                        <td className="px-3 py-2 text-center">{course.units}</td>
+                        <td className="px-3 py-2 text-center">{course.yearName}</td>
+                        <td className="px-3 py-2 text-center">{course.termName}</td>
+                        <td className="px-3 py-2 text-center">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                            course.status === 'passed' ? t.passedBadge :
+                            course.status === 'taking' ? t.takingBadge :
+                            `${t.secondaryBg} ${t.textMuted}`
+                          }`}>
+                            {course.status === 'passed' ? 'Passed' : course.status === 'taking' ? 'Active' : 'Inactive'}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <button
+                            onClick={() => setShowPriorityModal(course.id)}
+                            className={`text-xs ${coursePriorities[course.id] ? 'text-orange-600' : t.textMuted}`}
+                          >
+                            {coursePriorities[course.id] || 'Normal'}
+                          </button>
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <button
+                            onClick={() => toggleLock(course.id)}
+                            className={`p-1 rounded ${lockedCourses[course.id] ? 'text-red-500' : t.textMuted} hover:opacity-70`}
+                            title={lockedCourses[course.id] ? "Unlock from term" : "Lock to term"}
+                          >
+                            <Lock className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : planView === "compact" ? (
+            /* Compact View */
+            <div className="space-y-4">
+              {CURRICULUM_DATA.map((year, yIdx) => (
+                <div key={yIdx} className={`${t.cardBg} rounded-xl shadow-sm border ${t.cardBorder} p-4`}>
+                  <h3 className={`font-semibold ${t.textPrimary} mb-3`}>{year.year}</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {year.terms.flatMap(term => term.courses).map(course => {
+                      const status = courseStatus[course.id] || "inactive";
+                      return (
+                        <button
+                          key={course.id}
+                          onClick={() => toggleCourseSelection(course.id)}
+                          className={`px-2 py-1 rounded-lg text-[10px] font-medium border transition ${
+                            selectedCourses.has(course.id) 
+                              ? 'ring-2 ring-blue-500' 
+                              : ''
+                          } ${
+                            status === 'passed' 
+                              ? `${t.passedBg} ${t.passedBorder}` 
+                              : status === 'taking'
+                              ? 'bg-blue-50 border-blue-200'
+                              : `${t.secondaryBg} ${t.cardBorder}`
+                          }`}
+                        >
+                          {course.id}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            /* Timeline View (default) */
+            <div className="grid md:grid-cols-4 gap-4">
+              {CURRICULUM_DATA.map((year, yIdx) => (
+                <div key={yIdx} className="space-y-3">
+                  <h3 className={`font-semibold ${t.textPrimary} text-center`}>{year.year}</h3>
+                  {year.terms.map((term, tIdx) => {
+                    const termCourses = term.courses.filter(c => 
+                      !searchQuery || 
+                      c.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      c.title.toLowerCase().includes(searchQuery.toLowerCase())
+                    );
+                    
+                    return (
+                      <div key={tIdx} className={`${t.cardBg} rounded-xl shadow-sm border ${t.cardBorder} p-3`}>
+                        <div className={`text-xs font-semibold ${t.textSecondary} mb-2 uppercase tracking-wide`}>
+                          {term.termName}
+                        </div>
+                        <div className="space-y-1.5">
+                          {termCourses.map(course => {
+                            const status = courseStatus[course.id] || "inactive";
+                            const isSelected = selectedCourses.has(course.id);
+                            const isLocked = !!lockedCourses[course.id];
+                            const priority = coursePriorities[course.id];
+                            
+                            return (
+                              <div
+                                key={course.id}
+                                onClick={() => toggleCourseSelection(course.id)}
+                                className={`p-2 rounded-lg border cursor-pointer transition ${
+                                  isSelected ? 'ring-2 ring-blue-500' : ''
+                                } ${
+                                  status === 'passed' 
+                                    ? `${t.passedBg} ${t.passedBorder}` 
+                                    : status === 'taking'
+                                    ? 'bg-blue-50 border-blue-200'
+                                    : `${t.secondaryBg} ${t.cardBorder} hover:border-slate-300`
+                                }`}
+                              >
+                                <div className="flex items-start justify-between gap-1">
+                                  <div className="min-w-0">
+                                    <div className={`text-[10px] font-mono font-bold ${t.textSecondary}`}>
+                                      {course.id}
+                                    </div>
+                                    <div className={`text-[10px] ${t.textPrimary} truncate`}>
+                                      {course.title}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-1 flex-shrink-0">
+                                    {priority && (
+                                      <span className="text-[8px] px-1 py-0.5 rounded bg-orange-100 text-orange-600">
+                                        {priority}
+                                      </span>
+                                    )}
+                                    {isLocked && (
+                                      <Lock className="w-3 h-3 text-red-500" />
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Unscheduled Courses Floating Card */}
+          {showUnscheduled && unscheduledCourses.length > 0 && (
+            <div className={`fixed bottom-6 right-6 ${t.cardBg} rounded-xl shadow-2xl border ${t.cardBorder} p-4 max-w-sm z-30`}>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Inbox className={`w-4 h-4 ${t.accentText}`} />
+                  <span className={`text-sm font-semibold ${t.textPrimary}`}>
+                    Unscheduled ({unscheduledCourses.length})
+                  </span>
+                </div>
+                <button
+                  onClick={() => setShowUnscheduled(false)}
+                  className={`${t.textMuted} hover:${t.textSecondary}`}
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="max-h-48 overflow-y-auto space-y-1">
+                {unscheduledCourses.slice(0, 10).map(course => (
+                  <div
+                    key={course.id}
+                    className={`p-2 rounded-lg ${t.secondaryBg} text-xs`}
+                  >
+                    <span className="font-mono font-semibold">{course.id}</span>
+                    <span className={`${t.textMuted} ml-2`}>{course.units}u</span>
+                  </div>
+                ))}
+                {unscheduledCourses.length > 10 && (
+                  <div className={`text-xs ${t.textMuted} text-center pt-1`}>
+                    +{unscheduledCourses.length - 10} more
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Show Unscheduled button when hidden */}
+          {!showUnscheduled && unscheduledCourses.length > 0 && (
+            <button
+              onClick={() => setShowUnscheduled(true)}
+              className={`fixed bottom-6 right-6 ${t.primaryBtn} ${t.primaryBtnText} px-4 py-2 rounded-xl shadow-lg flex items-center gap-2 z-30`}
+            >
+              <Inbox className="w-4 h-4" />
+              Unscheduled ({unscheduledCourses.length})
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Priority Modal */}
+      {showPriorityModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className={`${t.cardBg} rounded-2xl shadow-2xl max-w-xs w-full p-6`}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className={`text-sm font-semibold ${t.textPrimary}`}>Set Priority</h3>
+              <button
+                onClick={() => setShowPriorityModal(null)}
+                className={`${t.textMuted} hover:${t.textSecondary}`}
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="space-y-2">
+              {['High', 'Normal', 'Low'].map(p => (
+                <button
+                  key={p}
+                  onClick={() => setPriority(showPriorityModal, p === 'Normal' ? null : p)}
+                  className={`w-full p-3 rounded-lg text-sm text-left transition ${
+                    (coursePriorities[showPriorityModal] || 'Normal') === p
+                      ? `${t.primaryBtn} ${t.primaryBtnText}`
+                      : `${t.secondaryBg} ${t.textSecondary} hover:opacity-80`
+                  }`}
+                >
+                  {p} Priority
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
+
+// ---------------- SCHEDULE MAKER PAGE ----------------
+const ScheduleMakerPage = ({ 
+  theme, 
+  courseStatus,
+  setSuccessMsg,
+  setErrorMsg,
+}) => {
+  const t = THEMES[theme];
+  const [selectedSections, setSelectedSections] = useState([]);
+  const [groupBy, setGroupBy] = useState("course"); // "course" | "department" | "room" | "section"
+  const [searchQuery, setSearchQuery] = useState("");
+  const [viewMode, setViewMode] = useState("table"); // "table" | "card"
+
+  // Mock schedule data - in production, this would come from the student portal
+  const mockSections = useMemo(() => {
+    const sections = [];
+    const days = ["M", "T", "W", "Th", "F", "S"];
+    const dayPairs = [["M", "W"], ["T", "Th"], ["M", "Th"], ["T", "F"], ["W", "F"], ["M", "F"]];
+    const times = ["7:00 AM", "8:30 AM", "10:00 AM", "11:30 AM", "1:00 PM", "2:30 PM", "4:00 PM"];
+    const rooms = ["R301", "R302", "R303", "R401", "R402", "LAB1", "LAB2"];
+    const instructorNames = [
+      "Prof. Santos", "Prof. Cruz", "Prof. Reyes", "Prof. Garcia", "Prof. Mendoza",
+      "Prof. Torres", "Prof. Flores", "Prof. Rivera", "Prof. Gonzales", "Prof. Ramos",
+      "Engr. Dela Cruz", "Engr. Villanueva", "Engr. Bautista", "Engr. Aquino", "Engr. Fernandez"
+    ];
+    
+    CURRICULUM_DATA.forEach(year => {
+      year.terms.forEach(term => {
+        term.courses.forEach(course => {
+          const status = courseStatus[course.id] || "inactive";
+          if (status !== "passed") {
+            // Generate 2-3 mock sections per course
+            const numSections = Math.floor(Math.random() * 2) + 2;
+            for (let i = 0; i < numSections; i++) {
+              const sectionLetter = String.fromCharCode(65 + i);
+              const dayPair = dayPairs[Math.floor(Math.random() * dayPairs.length)];
+              const time = times[Math.floor(Math.random() * times.length)];
+              const room = rooms[Math.floor(Math.random() * rooms.length)];
+              const instructor = instructorNames[Math.floor(Math.random() * instructorNames.length)];
+              
+              sections.push({
+                id: `${course.id}-${sectionLetter}`,
+                courseId: course.id,
+                courseTitle: course.title,
+                section: sectionLetter,
+                units: course.units,
+                schedule: `${dayPair[0]}/${dayPair[1]} ${time}`,
+                room: room,
+                instructor: instructor,
+                slots: Math.floor(Math.random() * 40) + 5,
+                department: course.id.startsWith("CE") ? "CE" : course.id.startsWith("COE") ? "COE" : "GED",
+              });
+            }
+          }
+        });
+      });
+    });
+    
+    return sections;
+  }, [courseStatus]);
+
+  // Filter sections
+  const filteredSections = useMemo(() => {
+    if (!searchQuery) return mockSections;
+    const query = searchQuery.toLowerCase();
+    return mockSections.filter(s =>
+      s.courseId.toLowerCase().includes(query) ||
+      s.courseTitle.toLowerCase().includes(query) ||
+      s.section.toLowerCase().includes(query) ||
+      s.room.toLowerCase().includes(query) ||
+      s.schedule.toLowerCase().includes(query)
+    );
+  }, [mockSections, searchQuery]);
+
+  // Group sections
+  const groupedSections = useMemo(() => {
+    const groups = {};
+    filteredSections.forEach(section => {
+      let key;
+      switch (groupBy) {
+        case "department":
+          key = section.department;
+          break;
+        case "room":
+          key = section.room;
+          break;
+        case "section":
+          key = section.section;
+          break;
+        default:
+          key = `${section.courseId} – ${section.courseTitle}`;
+      }
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(section);
+    });
+    return groups;
+  }, [filteredSections, groupBy]);
+
+  // Add section to schedule
+  const addToSchedule = (section) => {
+    // Check for time conflicts
+    const conflict = selectedSections.find(s => 
+      s.schedule === section.schedule && s.id !== section.id
+    );
+    
+    if (conflict) {
+      setErrorMsg(`Schedule conflict with ${conflict.courseId} Section ${conflict.section}`);
+      setTimeout(() => setErrorMsg(""), 3000);
+      return;
+    }
+    
+    // Check if course already added
+    const existing = selectedSections.find(s => s.courseId === section.courseId);
+    if (existing) {
+      setErrorMsg(`${section.courseId} is already in your schedule`);
+      setTimeout(() => setErrorMsg(""), 3000);
+      return;
+    }
+
+    // Check credit limit warning
+    const newTotalUnits = totalUnits + section.units;
+    if (newTotalUnits > 21) {
+      setErrorMsg(`Warning: Adding this course will put you at ${newTotalUnits} units (over typical 21 unit limit)`);
+      setTimeout(() => setErrorMsg(""), 4000);
+    }
+
+    // Check prerequisite status
+    const courseData = CURRICULUM_DATA.flatMap(y => y.terms.flatMap(t => t.courses)).find(c => c.id === section.courseId);
+    if (courseData && courseData.prereqs.length > 0) {
+      const unmetPrereqs = courseData.prereqs.filter(prereqId => courseStatus[prereqId] !== "passed");
+      if (unmetPrereqs.length > 0) {
+        setErrorMsg(`Warning: Prerequisites not met: ${unmetPrereqs.join(", ")}`);
+        setTimeout(() => setErrorMsg(""), 4000);
+      }
+    }
+    
+    setSelectedSections(prev => [...prev, section]);
+    setSuccessMsg(`Added ${section.courseId} Section ${section.section} to schedule`);
+    setTimeout(() => setSuccessMsg(""), 2000);
+  };
+
+  // Remove section from schedule
+  const removeFromSchedule = (sectionId) => {
+    setSelectedSections(prev => prev.filter(s => s.id !== sectionId));
+  };
+
+  // Calculate total units
+  const totalUnits = selectedSections.reduce((acc, s) => acc + s.units, 0);
+
+  // Check for warnings
+  const getScheduleWarnings = () => {
+    const warnings = [];
+    
+    if (totalUnits > 21) {
+      warnings.push({ type: "credit", message: `Credit limit exceeded: ${totalUnits} units (typical max: 21)` });
+    }
+    
+    // Check for prerequisite issues
+    selectedSections.forEach(section => {
+      const courseData = CURRICULUM_DATA.flatMap(y => y.terms.flatMap(t => t.courses)).find(c => c.id === section.courseId);
+      if (courseData && courseData.prereqs.length > 0) {
+        const unmetPrereqs = courseData.prereqs.filter(prereqId => courseStatus[prereqId] !== "passed");
+        if (unmetPrereqs.length > 0) {
+          warnings.push({ 
+            type: "prereq", 
+            message: `${section.courseId}: Missing prerequisites (${unmetPrereqs.join(", ")})` 
+          });
+        }
+      }
+    });
+
+    // Check for petition-required courses
+    selectedSections.forEach(section => {
+      if (isPetitionRequired(section.courseId)) {
+        warnings.push({
+          type: "petition",
+          message: `${section.courseId}: May require petition for enrollment`
+        });
+      }
+    });
+    
+    return warnings;
+  };
+
+  const scheduleWarnings = getScheduleWarnings();
+
+  // Constants for ICS export
+  const DEFAULT_CLASS_DURATION_MINUTES = 90; // Standard 1.5 hour class duration
+  const WEEKS_IN_SEMESTER = 16; // Standard semester length
+  
+  // Day abbreviation to offset mapping (0 = Monday)
+  const DAY_ABBREVIATION_MAP = { 'M': 0, 'T': 1, 'W': 2, 'Th': 3, 'F': 4, 'S': 5 };
+
+  // Export schedule as ICS (iCalendar format)
+  const exportScheduleICS = () => {
+    if (selectedSections.length === 0) {
+      setErrorMsg("No courses selected to export");
+      setTimeout(() => setErrorMsg(""), 3000);
+      return;
+    }
+
+    // Generate start date (next Monday)
+    const today = new Date();
+    const nextMonday = new Date(today);
+    nextMonday.setDate(today.getDate() + ((1 + 7 - today.getDay()) % 7 || 7));
+    
+    const formatDate = (date) => {
+      return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+    };
+
+    let icsContent = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//Builders Progress//Schedule Maker//EN',
+      'CALSCALE:GREGORIAN',
+      'METHOD:PUBLISH',
+      'X-WR-CALNAME:My Course Schedule',
+    ].join('\r\n') + '\r\n';
+
+    selectedSections.forEach((section, idx) => {
+      // Parse schedule (e.g., "M/W 7:00 AM")
+      const scheduleParts = section.schedule.split(' ');
+      const days = scheduleParts[0].split('/');
+      const timeStr = scheduleParts.slice(1).join(' ');
+      
+      // Convert time string to hours (simplified)
+      const timeMatch = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+      let hours = 0;
+      let minutes = 0;
+      if (timeMatch) {
+        hours = parseInt(timeMatch[1]);
+        minutes = parseInt(timeMatch[2]);
+        if (timeMatch[3].toUpperCase() === 'PM' && hours !== 12) hours += 12;
+        if (timeMatch[3].toUpperCase() === 'AM' && hours === 12) hours = 0;
+      }
+
+      days.forEach(day => {
+        const dayOffset = DAY_ABBREVIATION_MAP[day] || 0;
+        const eventDate = new Date(nextMonday);
+        eventDate.setDate(nextMonday.getDate() + dayOffset);
+        eventDate.setHours(hours, minutes, 0, 0);
+        
+        const endDate = new Date(eventDate);
+        endDate.setMinutes(endDate.getMinutes() + DEFAULT_CLASS_DURATION_MINUTES);
+
+        const uid = `${section.id}-${day}-${Date.now()}-${idx}@builders-progress`;
+        
+        icsContent += [
+          'BEGIN:VEVENT',
+          `UID:${uid}`,
+          `DTSTAMP:${formatDate(new Date())}`,
+          `DTSTART:${formatDate(eventDate)}`,
+          `DTEND:${formatDate(endDate)}`,
+          `SUMMARY:${section.courseId} - ${section.section}`,
+          `DESCRIPTION:${section.courseTitle}\\nInstructor: ${section.instructor}\\nUnits: ${section.units}`,
+          `LOCATION:${section.room}`,
+          `RRULE:FREQ=WEEKLY;COUNT=${WEEKS_IN_SEMESTER}`,
+          'STATUS:CONFIRMED',
+          'END:VEVENT',
+        ].join('\r\n') + '\r\n';
+      });
+    });
+
+    icsContent += 'END:VCALENDAR';
+
+    const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const dateStr = new Date().toISOString().split('T')[0];
+    a.download = `course-schedule-${dateStr}.ics`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    setSuccessMsg("Schedule exported to ICS! Import this file to Google Calendar, Outlook, or Apple Calendar.");
+    setTimeout(() => setSuccessMsg(""), 4000);
+  };
+
+  // Export schedule as CSV
+  const exportScheduleCSV = () => {
+    if (selectedSections.length === 0) {
+      setErrorMsg("No courses selected to export");
+      setTimeout(() => setErrorMsg(""), 3000);
+      return;
+    }
+
+    const headers = ['Course Code', 'Section', 'Title', 'Units', 'Schedule', 'Room', 'Instructor'];
+    const rows = selectedSections.map(s => [
+      s.courseId,
+      s.section,
+      `"${s.courseTitle}"`,
+      s.units,
+      `"${s.schedule}"`,
+      s.room,
+      `"${s.instructor}"`
+    ]);
+
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const dateStr = new Date().toISOString().split('T')[0];
+    a.download = `course-schedule-${dateStr}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    setSuccessMsg("Schedule exported to CSV!");
+    setTimeout(() => setSuccessMsg(""), 3000);
+  };
+
+  // Export schedule as image
+  const exportScheduleImage = () => {
+    setSuccessMsg("Schedule exported! (Use browser screenshot for now)");
+    setTimeout(() => setSuccessMsg(""), 3000);
+  };
+
+  return (
+    <>
+      {/* Hero */}
+      <div className={`${t.heroBg} text-white pb-8 pt-10 px-6 shadow-xl`}>
+        <div className="max-w-6xl mx-auto">
+          <div className="flex items-center gap-3 mb-2">
+            <Table className={`w-8 h-8 ${t.heroAccent}`} />
+            <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
+              Schedule Maker
+            </h1>
+          </div>
+          <p className={`${t.heroText} opacity-90 text-sm md:text-base`}>
+            Build your mock enrolment schedule. Select sections and check for conflicts.
+          </p>
+          <p className={`text-xs ${t.heroText} opacity-70 mt-2`}>
+            Data source: <a href={STUDENT_PORTAL_URL} target="_blank" rel="noopener noreferrer" className="underline">solar.feutech.edu.ph/course/offerings</a>
+          </p>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className={`${t.bodyBg} flex-1`}>
+        <div className="max-w-6xl mx-auto px-4 py-6">
+          {/* Warnings Panel */}
+          {scheduleWarnings.length > 0 && (
+            <div className={`mb-6 ${t.cardBg} rounded-xl border border-orange-300 p-4`}>
+              <div className="flex items-center gap-2 mb-3">
+                <AlertTriangle className="w-5 h-5 text-orange-500" />
+                <h3 className={`font-semibold ${t.textPrimary}`}>Schedule Warnings</h3>
+              </div>
+              <div className="space-y-2">
+                {scheduleWarnings.map((warning, idx) => (
+                  <div key={idx} className="flex items-start gap-2 text-sm">
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${
+                      warning.type === "credit" ? "bg-red-100 text-red-700" :
+                      warning.type === "prereq" ? "bg-orange-100 text-orange-700" :
+                      "bg-amber-100 text-amber-700"
+                    }`}>
+                      {warning.type === "credit" ? "Credit" : 
+                       warning.type === "prereq" ? "Prereq" : "Petition"}
+                    </span>
+                    <span className={t.textSecondary}>{warning.message}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Summary Stats */}
+          <div className="grid md:grid-cols-3 gap-4 mb-6">
+            <div className={`${t.cardBg} rounded-xl p-4 border ${t.cardBorder}`}>
+              <div className={`text-xs ${t.textMuted} uppercase tracking-wide`}>Selected Courses</div>
+              <div className={`text-2xl font-bold ${t.textPrimary}`}>{selectedSections.length}</div>
+            </div>
+            <div className={`${t.cardBg} rounded-xl p-4 border ${t.cardBorder}`}>
+              <div className={`text-xs ${t.textMuted} uppercase tracking-wide`}>Total Units</div>
+              <div className={`text-2xl font-bold ${t.textPrimary}`}>{totalUnits}</div>
+              {totalUnits > 21 && (
+                <div className="text-xs text-orange-600 mt-1">⚠️ Over typical limit</div>
+              )}
+            </div>
+            <div className={`${t.cardBg} rounded-xl p-4 border ${t.cardBorder}`}>
+              <div className={`text-xs ${t.textMuted} uppercase tracking-wide`}>Available Sections</div>
+              <div className={`text-2xl font-bold ${t.textPrimary}`}>{filteredSections.length}</div>
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6">
+            {/* Selected Schedule */}
+            <div className={`${t.cardBg} rounded-xl border ${t.cardBorder} p-4`}>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className={`font-semibold ${t.textPrimary} flex items-center gap-2`}>
+                  <Calendar className={`w-4 h-4 ${t.accentText}`} />
+                  My Schedule
+                </h2>
+              </div>
+              
+              {/* Export Options */}
+              {selectedSections.length > 0 && (
+                <div className={`mb-4 p-3 rounded-lg ${t.secondaryBg} border ${t.cardBorder}`}>
+                  <p className={`text-xs ${t.textMuted} mb-2`}>Export to:</p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={exportScheduleICS}
+                      className={`text-xs px-2 py-1 rounded-lg ${t.primaryBtn} ${t.primaryBtnText} flex items-center gap-1`}
+                      title="Import to Google Calendar, Outlook, or Apple Calendar"
+                    >
+                      <Calendar className="w-3 h-3" />
+                      Google Calendar (ICS)
+                    </button>
+                    <button
+                      onClick={exportScheduleCSV}
+                      className={`text-xs px-2 py-1 rounded-lg border ${t.cardBorder} ${t.textSecondary} hover:${t.textPrimary} flex items-center gap-1`}
+                      title="Download as CSV spreadsheet"
+                    >
+                      <FileText className="w-3 h-3" />
+                      CSV
+                    </button>
+                  </div>
+                </div>
+              )}
+              
+              {selectedSections.length === 0 ? (
+                <div className={`text-sm ${t.textMuted} text-center py-8`}>
+                  No courses selected yet. Browse available sections and add them to your schedule.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {selectedSections.map(section => (
+                    <div key={section.id} className={`p-3 rounded-lg ${t.secondaryBg} border ${t.cardBorder}`}>
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <div className={`text-xs font-mono font-bold ${t.textPrimary}`}>
+                            {section.courseId} – {section.section}
+                          </div>
+                          <div className={`text-[10px] ${t.textSecondary} mt-0.5`}>
+                            {section.courseTitle}
+                          </div>
+                          <div className={`text-[10px] ${t.textMuted} mt-1`}>
+                            {section.schedule} • {section.room}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => removeFromSchedule(section.id)}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Available Sections */}
+            <div className="md:col-span-2">
+              {/* Toolbar */}
+              <div className={`${t.cardBg} rounded-xl border ${t.cardBorder} p-4 mb-4`}>
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  {/* Search */}
+                  <div className="relative flex-1 max-w-xs">
+                    <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${t.textMuted}`} />
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search courses, rooms, times..."
+                      className={`w-full pl-9 pr-4 py-2 rounded-lg text-sm border ${t.cardBorder} ${t.cardBg} ${t.textPrimary}`}
+                    />
+                  </div>
+
+                  {/* Group By */}
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs ${t.textMuted}`}>Group by:</span>
+                    <div className={`flex items-center gap-1 ${t.secondaryBg} rounded-lg p-1`}>
+                      <button
+                        onClick={() => setGroupBy("course")}
+                        className={`px-2 py-1 rounded text-xs transition ${groupBy === "course" ? `${t.primaryBtn} ${t.primaryBtnText}` : `${t.textSecondary}`}`}
+                      >
+                        <Code className="w-3 h-3 inline mr-1" />
+                        Course
+                      </button>
+                      <button
+                        onClick={() => setGroupBy("department")}
+                        className={`px-2 py-1 rounded text-xs transition ${groupBy === "department" ? `${t.primaryBtn} ${t.primaryBtnText}` : `${t.textSecondary}`}`}
+                      >
+                        <Building2 className="w-3 h-3 inline mr-1" />
+                        Dept
+                      </button>
+                      <button
+                        onClick={() => setGroupBy("room")}
+                        className={`px-2 py-1 rounded text-xs transition ${groupBy === "room" ? `${t.primaryBtn} ${t.primaryBtnText}` : `${t.textSecondary}`}`}
+                      >
+                        <MapPin className="w-3 h-3 inline mr-1" />
+                        Room
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* View Mode */}
+                  <div className={`flex items-center gap-1 ${t.secondaryBg} rounded-lg p-1`}>
+                    <button
+                      onClick={() => setViewMode("table")}
+                      className={`px-2 py-1 rounded text-xs transition ${viewMode === "table" ? `${t.primaryBtn} ${t.primaryBtnText}` : `${t.textSecondary}`}`}
+                    >
+                      <Table className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => setViewMode("card")}
+                      className={`px-2 py-1 rounded text-xs transition ${viewMode === "card" ? `${t.primaryBtn} ${t.primaryBtnText}` : `${t.textSecondary}`}`}
+                    >
+                      <LayoutGrid className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Filter Summary */}
+                <div className={`text-xs ${t.textMuted} mt-3`}>
+                  Showing {filteredSections.length} section{filteredSections.length !== 1 ? 's' : ''} 
+                  in {Object.keys(groupedSections).length} group{Object.keys(groupedSections).length !== 1 ? 's' : ''}
+                </div>
+              </div>
+
+              {/* Sections List */}
+              <div className={`${t.cardBg} rounded-xl border ${t.cardBorder} overflow-hidden`}>
+                {Object.entries(groupedSections).map(([groupName, sections]) => (
+                  <div key={groupName} className={`border-b ${t.cardBorder} last:border-b-0`}>
+                    <div className={`px-4 py-2 ${t.secondaryBg} font-semibold text-sm ${t.textPrimary}`}>
+                      {groupName}
+                    </div>
+                    
+                    {viewMode === "table" ? (
+                      <table className="w-full text-xs">
+                        <thead className={`${t.secondaryBg}`}>
+                          <tr>
+                            <th className="px-4 py-2 text-left font-medium">Section</th>
+                            <th className="px-4 py-2 text-left font-medium">Schedule</th>
+                            <th className="px-4 py-2 text-left font-medium">Room</th>
+                            <th className="px-4 py-2 text-center font-medium">Units</th>
+                            <th className="px-4 py-2 text-center font-medium">Slots</th>
+                            <th className="px-4 py-2 text-center font-medium">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {sections.map(section => {
+                            const isSelected = selectedSections.some(s => s.id === section.id);
+                            const hasConflict = selectedSections.some(s => 
+                              s.schedule === section.schedule && s.id !== section.id
+                            );
+                            
+                            return (
+                              <tr key={section.id} className={`border-t ${t.cardBorder} ${isSelected ? t.passedBg : ''}`}>
+                                <td className={`px-4 py-2 font-mono ${t.textPrimary}`}>
+                                  {section.courseId}-{section.section}
+                                </td>
+                                <td className={`px-4 py-2 ${t.textSecondary}`}>{section.schedule}</td>
+                                <td className={`px-4 py-2 ${t.textSecondary}`}>{section.room}</td>
+                                <td className={`px-4 py-2 text-center ${t.textSecondary}`}>{section.units}</td>
+                                <td className={`px-4 py-2 text-center ${t.textSecondary}`}>{section.slots}</td>
+                                <td className="px-4 py-2 text-center">
+                                  {isSelected ? (
+                                    <button
+                                      onClick={() => removeFromSchedule(section.id)}
+                                      className="text-red-500 text-xs"
+                                    >
+                                      Remove
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={() => addToSchedule(section)}
+                                      className={`text-xs ${hasConflict ? 'text-orange-500' : t.accentText}`}
+                                    >
+                                      {hasConflict ? '⚠️ Add' : 'Add'}
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <div className="p-4 grid md:grid-cols-2 gap-3">
+                        {sections.map(section => {
+                          const isSelected = selectedSections.some(s => s.id === section.id);
+                          
+                          return (
+                            <div
+                              key={section.id}
+                              className={`p-3 rounded-lg border ${isSelected ? `${t.passedBg} ${t.passedBorder}` : `${t.secondaryBg} ${t.cardBorder}`}`}
+                            >
+                              <div className="flex items-start justify-between">
+                                <div>
+                                  <div className={`text-xs font-mono font-bold ${t.textPrimary}`}>
+                                    {section.courseId}-{section.section}
+                                  </div>
+                                  <div className={`text-[10px] ${t.textSecondary}`}>{section.schedule}</div>
+                                  <div className={`text-[10px] ${t.textMuted}`}>{section.room} • {section.units}u • {section.slots} slots</div>
+                                </div>
+                                {isSelected ? (
+                                  <button
+                                    onClick={() => removeFromSchedule(section.id)}
+                                    className="text-red-500"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => addToSchedule(section)}
+                                    className={`${t.primaryBtn} ${t.primaryBtnText} text-xs px-2 py-1 rounded`}
+                                  >
+                                    Add
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ))}
+                
+                {Object.keys(groupedSections).length === 0 && (
+                  <div className={`p-8 text-center ${t.textMuted}`}>
+                    No sections found matching your search.
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -2486,14 +4634,15 @@ const App = () => {
   const [courseGPA, setCourseGPA] = useState({});
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
-  const [activePage, setActivePage] = useState("tracker"); // "tracker" | "gpa" | "visualizer"
+  const [activePage, setActivePage] = useState("home"); // "home" | "tracker" | "gpa" | "visualizer" | "planner" | "schedule"
   const [theme, setTheme] = useState("feuGreen"); // "feuGreen" | "acesTheme" | "dark" | "highContrast"
-  const [viewMode, setViewMode] = useState("card"); // "card" | "list"
+  const [viewMode, setViewMode] = useState("card"); // "card" | "timeline" | "table" | "compact"
   const [showWhatCanITake, setShowWhatCanITake] = useState(false);
   const [hoveredCourse, setHoveredCourse] = useState(null);
   const [yearEnteredCollege, setYearEnteredCollege] = useState("");
   const [showConfetti, setShowConfetti] = useState(false);
   const [confettiSize, setConfettiSize] = useState("small");
+  const [confettiRunning, setConfettiRunning] = useState(true);
   const [showThemeModal, setShowThemeModal] = useState(false);
   
   const t = THEMES[theme];
@@ -2565,8 +4714,16 @@ const App = () => {
   // Handle confetti
   const triggerConfetti = useCallback((size) => {
     setConfettiSize(size);
+    setConfettiRunning(true);
     setShowConfetti(true);
-    setTimeout(() => setShowConfetti(false), size === "big" ? 5000 : 2000);
+    // Stop producing new confetti after the display time, but keep showing until complete
+    setTimeout(() => setConfettiRunning(false), size === "big" ? 5000 : 2000);
+  }, []);
+
+  // Called when all confetti pieces have left the screen
+  const handleConfettiComplete = useCallback(() => {
+    setShowConfetti(false);
+    setConfettiRunning(true); // Reset for next trigger
   }, []);
 
   return (
@@ -2579,9 +4736,10 @@ const App = () => {
         <Confetti
           width={window.innerWidth}
           height={window.innerHeight}
-          recycle={false}
-          numberOfPieces={confettiSize === "big" ? 500 : 100}
+          recycle={confettiRunning}
+          numberOfPieces={confettiRunning ? (confettiSize === "big" ? 500 : 100) : 0}
           gravity={confettiSize === "big" ? 0.3 : 0.5}
+          onConfettiComplete={handleConfettiComplete}
         />
       )}
 
@@ -2620,6 +4778,7 @@ const App = () => {
                     <div className={`font-medium ${theme === key ? '' : t.textPrimary}`}>{themeData.name}</div>
                     <div className={`text-xs ${theme === key ? 'opacity-70' : t.textMuted}`}>
                       {key === "feuGreen" && "School colors theme"}
+                      {key === "feuGold" && "FEU Gold color palette"}
                       {key === "acesTheme" && "ACES blue color palette"}
                       {key === "dark" && "For late-night study sessions"}
                       {key === "highContrast" && "Accessibility-focused"}
@@ -2635,53 +4794,78 @@ const App = () => {
       {/* Top navigation to switch pages */}
       <header className={`w-full ${t.headerBg} border-b ${t.headerBorder} sticky top-0 z-40`}>
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <button 
+            onClick={() => setActivePage("home")}
+            className="flex items-center gap-2 hover:opacity-80 transition"
+          >
             <GraduationCap className={`w-5 h-5 ${t.accentText}`} />
             <span className={`font-semibold ${t.textPrimary} text-sm md:text-base`}>
-              BSCE Academic Tools
+              Builders Progress
             </span>
-          </div>
-          <nav className="flex items-center gap-2 text-xs md:text-sm">
+          </button>
+          <nav className="flex items-center gap-1 md:gap-2 text-xs md:text-sm overflow-x-auto">
+            <button
+              type="button"
+              onClick={() => setActivePage("home")}
+              className={`inline-flex items-center gap-1 px-2 md:px-3 py-1.5 rounded-full border text-xs md:text-sm transition ${
+                activePage === "home"
+                  ? t.navActive
+                  : `${t.cardBg} ${t.textSecondary} ${t.cardBorder} hover:opacity-80`
+              }`}
+            >
+              <Home className="w-4 h-4" />
+              <span className="hidden md:inline">Home</span>
+            </button>
             <button
               type="button"
               onClick={() => setActivePage("tracker")}
-              className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full border text-xs md:text-sm transition ${
+              className={`inline-flex items-center gap-1 px-2 md:px-3 py-1.5 rounded-full border text-xs md:text-sm transition ${
                 activePage === "tracker"
                   ? t.navActive
                   : `${t.cardBg} ${t.textSecondary} ${t.cardBorder} hover:opacity-80`
               }`}
             >
               <LayoutTemplate className="w-4 h-4" />
-              Curriculum Tracker
+              <span className="hidden md:inline">Tracker</span>
             </button>
             <button
               type="button"
               onClick={() => setActivePage("gpa")}
-              className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full border text-xs md:text-sm transition ${
+              className={`inline-flex items-center gap-1 px-2 md:px-3 py-1.5 rounded-full border text-xs md:text-sm transition ${
                 activePage === "gpa"
                   ? t.navActive
                   : `${t.cardBg} ${t.textSecondary} ${t.cardBorder} hover:opacity-80`
               }`}
             >
               <Calculator className="w-4 h-4" />
-              GPA Calculator
+              <span className="hidden md:inline">GPA</span>
             </button>
             <button
               type="button"
               onClick={() => setActivePage("visualizer")}
-              className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full border text-xs md:text-sm transition ${
+              className={`inline-flex items-center gap-1 px-2 md:px-3 py-1.5 rounded-full border text-xs md:text-sm transition ${
                 activePage === "visualizer"
                   ? t.navActive
                   : `${t.cardBg} ${t.textSecondary} ${t.cardBorder} hover:opacity-80`
               }`}
             >
               <Link2 className="w-4 h-4" />
-              Chain Visualizer
+              <span className="hidden md:inline">Visualizer</span>
+            </button>
+            <button
+              type="button"
+              disabled
+              title="Coming Soon - Under Development"
+              className={`inline-flex items-center gap-1 px-2 md:px-3 py-1.5 rounded-full border text-xs md:text-sm transition ${t.cardBg} ${t.textMuted} ${t.cardBorder} opacity-50 cursor-not-allowed relative`}
+            >
+              <Table className="w-4 h-4" />
+              <span className="hidden md:inline">Schedule</span>
+              <span className="absolute -top-1 -right-1 w-2 h-2 bg-amber-500 rounded-full"></span>
             </button>
             <button
               type="button"
               onClick={() => setShowThemeModal(true)}
-              className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full border text-xs md:text-sm transition ${t.cardBg} ${t.textSecondary} ${t.cardBorder} hover:opacity-80`}
+              className={`inline-flex items-center gap-1 px-2 md:px-3 py-1.5 rounded-full border text-xs md:text-sm transition ${t.cardBg} ${t.textSecondary} ${t.cardBorder} hover:opacity-80`}
             >
               <Palette className="w-4 h-4" />
             </button>
@@ -2689,6 +4873,30 @@ const App = () => {
         </div>
       </header>
 
+      {/* Success/Error Messages */}
+      {errorMsg && (
+        <div className={`fixed top-20 left-1/2 transform -translate-x-1/2 ${t.cardBg} border-l-4 border-red-500 ${t.textPrimary} px-6 py-4 rounded-xl shadow-2xl z-50 flex items-center max-w-md`}>
+          <AlertCircle className="w-5 h-5 mr-3 text-red-500 flex-shrink-0" />
+          <span className="font-medium text-sm">{errorMsg}</span>
+        </div>
+      )}
+
+      {successMsg && (
+        <div className={`fixed top-20 left-1/2 transform -translate-x-1/2 ${t.cardBg} border-l-4 border-green-500 ${t.textPrimary} px-6 py-4 rounded-xl shadow-2xl z-50 flex items-center max-w-md`}>
+          <Check className="w-5 h-5 mr-3 text-green-500 flex-shrink-0" />
+          <span className="font-medium text-sm">{successMsg}</span>
+        </div>
+      )}
+
+      {activePage === "home" && (
+        <MenuLandingPage
+          theme={theme}
+          setActivePage={setActivePage}
+          courseStatus={courseStatus}
+          yearEnteredCollege={yearEnteredCollege}
+          setYearEnteredCollege={setYearEnteredCollege}
+        />
+      )}
       {activePage === "tracker" && (
         <CurriculumTrackerPage
           courseStatus={courseStatus}
@@ -2704,8 +4912,6 @@ const App = () => {
           setShowWhatCanITake={setShowWhatCanITake}
           hoveredCourse={hoveredCourse}
           setHoveredCourse={setHoveredCourse}
-          yearEnteredCollege={yearEnteredCollege}
-          setYearEnteredCollege={setYearEnteredCollege}
           courseGPA={courseGPA}
           onConfetti={triggerConfetti}
         />
@@ -2725,6 +4931,14 @@ const App = () => {
         <ChainVisualizerPage
           theme={theme}
           courseStatus={courseStatus}
+        />
+      )}
+      {activePage === "schedule" && (
+        <ScheduleMakerPage
+          theme={theme}
+          courseStatus={courseStatus}
+          setSuccessMsg={setSuccessMsg}
+          setErrorMsg={setErrorMsg}
         />
       )}
     </div>
